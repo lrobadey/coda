@@ -6,6 +6,160 @@ import { listOpportunities } from "../../../lib/opportunities";
 
 export const maxDuration = 60;
 
+const STAGE_LABELS = {
+  found: "Discovered",
+  interested: "Interested",
+  in_progress: "Ongoing",
+  submitted: "Submitted",
+  response: "Decision made",
+};
+
+const TOOL_META = {
+  list_opportunities: {
+    label: "Search tracker",
+    icon: "search",
+    started: "Reading your pipeline…",
+    completed: "Reviewed your pipeline.",
+  },
+  create_opportunity: {
+    label: "Create opportunity",
+    icon: "plus",
+    started: "Adding an opportunity…",
+    completed: "Opportunity added.",
+  },
+  update_opportunity: {
+    label: "Update opportunity",
+    icon: "doc",
+    started: "Updating details…",
+    completed: "Opportunity updated.",
+  },
+  move_opportunity: {
+    label: "Move stage",
+    icon: "board",
+    started: "Moving across the pipeline…",
+    completed: "Pipeline updated.",
+  },
+  delete_opportunity: {
+    label: "Delete opportunity",
+    icon: "trash",
+    started: "Deleting opportunity…",
+    completed: "Opportunity deleted.",
+  },
+};
+
+function parseMaybeJson(value) {
+  if (!value || typeof value !== "string") return value ?? null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function formatStage(stage) {
+  return STAGE_LABELS[stage] || stage || "Unknown stage";
+}
+
+function formatToolAction(name, args = {}) {
+  if (name === "list_opportunities") return "Scanning tracked opportunities";
+
+  if (name === "create_opportunity") {
+    return `Creating “${args.title || "Untitled opportunity"}”${args.org ? ` at ${args.org}` : ""}`;
+  }
+
+  if (name === "update_opportunity") {
+    const fields = [
+      args.title ? "title" : null,
+      args.org ? "organization" : null,
+      args.deadline ? "deadline" : null,
+      args.stage ? "stage" : null,
+      args.source_url ? "source" : null,
+      args.notes ? "notes" : null,
+    ].filter(Boolean);
+    return fields.length ? `Updating ${fields.join(", ")}` : "Updating opportunity details";
+  }
+
+  if (name === "move_opportunity") return `Moving to ${formatStage(args.stage)}`;
+
+  if (name === "delete_opportunity") {
+    return args.confirmed ? "Deleting a confirmed opportunity" : "Checking delete confirmation";
+  }
+
+  return "Using Coda tool";
+}
+
+function formatToolResult(name, output) {
+  if (name === "list_opportunities" && Array.isArray(output)) {
+    return `Found ${output.length} tracked ${output.length === 1 ? "opportunity" : "opportunities"}`;
+  }
+
+  if (name === "create_opportunity" && output?.title) return `Created “${output.title}”`;
+  if (name === "update_opportunity" && output?.title) return `Updated “${output.title}”`;
+  if (name === "move_opportunity" && output?.title) return `Moved “${output.title}” to ${formatStage(output.stage)}`;
+  if (name === "delete_opportunity" && output?.deleted) return "Deleted the opportunity";
+  if (output?.needs_confirmation) return "Waiting for your confirmation";
+
+  return TOOL_META[name]?.completed || "Tool finished";
+}
+
+function getTextDelta(event) {
+  if (!event || typeof event !== "object") return "";
+  if (event.type === "output_text_delta" && typeof event.delta === "string") return event.delta;
+  return "";
+}
+
+function getRawToolItem(event) {
+  return event?.item?.rawItem || event?.item || {};
+}
+
+function getToolName(event) {
+  return getRawToolItem(event).name || event?.item?.name || "tool";
+}
+
+function getToolId(event) {
+  const raw = getRawToolItem(event);
+  return raw.callId || raw.call_id || raw.id || `${getToolName(event)}-${event.name}`;
+}
+
+function getToolStatus(event) {
+  if (event?.type !== "run_item_stream_event") return null;
+
+  const name = getToolName(event);
+  const meta = TOOL_META[name] || { label: "Coda tool", icon: "sparkle" };
+  const raw = getRawToolItem(event);
+  const id = getToolId(event);
+
+  if (event.name === "tool_called") {
+    const args = parseMaybeJson(raw.arguments) || {};
+    return {
+      type: "tool",
+      id,
+      name,
+      label: meta.label,
+      icon: meta.icon,
+      status: "started",
+      message: meta.started || "Using a tool…",
+      action: formatToolAction(name, args),
+    };
+  }
+
+  if (event.name === "tool_output") {
+    const output = parseMaybeJson(raw.output);
+    return {
+      type: "tool",
+      id,
+      name,
+      label: meta.label,
+      icon: meta.icon,
+      status: output?.needs_confirmation ? "waiting" : "completed",
+      message: output?.needs_confirmation ? "Waiting for confirmation." : meta.completed || "Tool finished.",
+      result: formatToolResult(name, output),
+    };
+  }
+
+  return null;
+}
+
 export async function POST(request) {
   try {
     const { message, history = [] } = await request.json();
@@ -30,18 +184,61 @@ export async function POST(request) {
       { role: "user", content: message },
     ];
 
-    const result = await run(agent, input, {
-      maxTurns: 8,
-      tracing: true,
+    const encoder = new TextEncoder();
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (payload) => {
+          controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
+        };
+
+        try {
+          send({ type: "status", message: "Coda is thinking…" });
+
+          const result = await run(agent, input, {
+            stream: true,
+            maxTurns: 8,
+            tracing: true,
+            signal: request.signal,
+          });
+
+          for await (const event of result) {
+            if (event.type === "raw_model_stream_event") {
+              const delta = getTextDelta(event.data);
+              if (delta) send({ type: "delta", text: delta });
+              continue;
+            }
+
+            const toolStatus = getToolStatus(event);
+            if (toolStatus) send(toolStatus);
+          }
+
+          await result.completed;
+
+          const opportunities = await listOpportunities(supabase);
+
+          send({
+            type: "final",
+            output: result.finalOutput || "Done.",
+            history: result.history,
+            lastResponseId: result.lastResponseId,
+            opportunities,
+          });
+        } catch (error) {
+          console.error("Assistant stream error", error);
+          send({ type: "error", error: error?.message || "Assistant failed." });
+        } finally {
+          controller.close();
+        }
+      },
     });
 
-    const opportunities = await listOpportunities(supabase);
-
-    return NextResponse.json({
-      output: result.finalOutput || "Done.",
-      history: result.history,
-      lastResponseId: result.lastResponseId,
-      opportunities,
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
+      },
     });
   } catch (error) {
     console.error("Assistant route error", error);

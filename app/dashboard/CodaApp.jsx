@@ -44,6 +44,8 @@ function Icon({ name, size = 18, stroke = "currentColor", sw = 1.9, fill = "none
     search: <g {...p}><circle cx="8" cy="8" r="5.2" /><path d="M12.5 12.5 L17 17" /></g>,
     plus: <g {...p}><path d="M10 4 V16 M4 10 H16" /></g>,
     x: <g {...p}><path d="M5 5 L15 15 M15 5 L5 15" /></g>,
+    check: <g {...p}><path d="M4.5 10.5 L8.1 14 L15.5 6" /></g>,
+    clock: <g {...p}><circle cx="10" cy="10" r="6.5" /><path d="M10 6.5 V10.3 L12.8 12" /></g>,
     trash: <g {...p}><path d="M4 6 H16 M8 6 V4 H12 V6 M6 6 L7 16 H13 L14 6" /></g>,
     board: <g {...p}><rect x="3" y="4" width="4.4" height="12" rx="1" /><rect x="9.3" y="4" width="4.4" height="8" rx="1" /><rect x="15.6" y="4" width="2" height="12" rx="1" /></g>,
     cal: <g {...p}><rect x="3.2" y="4.5" width="13.6" height="12" rx="1.6" /><path d="M3.2 8 H16.8 M7 3 V6 M13 3 V6" /></g>,
@@ -247,7 +249,54 @@ function EmptyView({ view }) {
   );
 }
 
-function AssistantView({ messages, pending, onSend }) {
+function ToolCallCard({ tool }) {
+  const done = tool.status === "completed";
+  const waiting = tool.status === "waiting";
+  const icon = done ? "check" : waiting ? "clock" : tool.icon || "sparkle";
+  const accent = done ? "var(--good)" : waiting ? "var(--warn)" : "var(--accent-bright)";
+  const result = tool.result || tool.action || tool.message;
+
+  return (
+    <div className="fade" style={{
+      padding: 3,
+      borderRadius: 16,
+      background: `linear-gradient(135deg, color-mix(in oklch, ${accent} 45%, transparent), var(--border), transparent)`,
+      maxWidth: 520,
+    }}>
+      <div className="row gap10" style={{
+        padding: "10px 12px",
+        borderRadius: 13,
+        background: "linear-gradient(180deg, var(--surface-2), var(--surface))",
+        border: "1px solid var(--hairline)",
+        boxShadow: "inset 0 1px 0 oklch(1 0 0 / 0.08)",
+        alignItems: "flex-start",
+      }}>
+        <span style={{
+          width: 30,
+          height: 30,
+          borderRadius: 11,
+          display: "grid",
+          placeItems: "center",
+          flex: "none",
+          color: accent,
+          background: `color-mix(in oklch, ${accent} 15%, transparent)`,
+          border: `1px solid color-mix(in oklch, ${accent} 34%, transparent)`,
+        }}>
+          <Icon name={icon} size={15} stroke={accent} sw={2} />
+        </span>
+        <span className="col grow" style={{ gap: 4 }}>
+          <span className="row gap8 between">
+            <span className="disp" style={{ fontSize: 13.5, fontWeight: 700 }}>{tool.label || "Coda tool"}</span>
+            <span className="label" style={{ color: accent }}>{done ? "done" : waiting ? "waiting" : "running"}</span>
+          </span>
+          <span className="tx3" style={{ fontSize: 12.5, lineHeight: 1.35 }}>{result}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function AssistantView({ messages, pending, status, onSend }) {
   const [input, setInput] = useState("");
   const submit = async (e) => {
     e.preventDefault();
@@ -280,25 +329,39 @@ function AssistantView({ messages, pending, onSend }) {
               </div>
             </div>
           )}
-          {messages.map((message) => (
-            <div key={message.id} className="col" style={{ alignItems: message.role === "user" ? "flex-end" : "flex-start" }}>
-              <div className="card" style={{
-                maxWidth: "min(680px, 88%)",
-                padding: "12px 14px",
-                background: message.role === "user" ? "var(--accent)" : message.error ? "var(--accent-soft)" : "var(--surface-2)",
-                borderColor: message.error ? "var(--accent-line)" : "var(--border)",
-                color: message.role === "user" ? "#fff" : "var(--tx)",
-                whiteSpace: "pre-wrap",
-                lineHeight: 1.45,
-                fontSize: 14,
-              }}>
-                {message.content}
+          {messages.map((message) => {
+            const isUser = message.role === "user";
+            const hasTools = !isUser && Array.isArray(message.tools) && message.tools.length > 0;
+            const showBubble = isUser || message.content || message.error || !hasTools;
+
+            return (
+              <div key={message.id} className="col" style={{ alignItems: isUser ? "flex-end" : "flex-start" }}>
+                <div className="col gap8" style={{ alignItems: isUser ? "flex-end" : "flex-start", maxWidth: "min(680px, 88%)" }}>
+                  {hasTools && (
+                    <div className="col gap8" style={{ width: "min(540px, 100%)" }}>
+                      {message.tools.map((tool) => <ToolCallCard key={tool.id || `${tool.name}-${tool.status}`} tool={tool} />)}
+                    </div>
+                  )}
+                  {showBubble && (
+                    <div className="card fade" style={{
+                      padding: "12px 14px",
+                      background: isUser ? "var(--accent)" : message.error ? "var(--accent-soft)" : "var(--surface-2)",
+                      borderColor: message.error ? "var(--accent-line)" : "var(--border)",
+                      color: isUser ? "#fff" : "var(--tx)",
+                      whiteSpace: "pre-wrap",
+                      lineHeight: 1.45,
+                      fontSize: 14,
+                    }}>
+                      {message.content}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {pending && (
             <div className="row gap8 tx3" style={{ fontSize: 13, padding: "2px 4px" }}>
-              <Icon name="sparkle" size={15} stroke="var(--accent-bright)" /> Coda is working…
+              <Icon name="sparkle" size={15} stroke="var(--accent-bright)" /> {status || "Coda is working…"}
             </div>
           )}
         </div>
@@ -403,6 +466,7 @@ function App({ initialOpportunities = [], userId, userEmail, initialError = "" }
   const [assistantMessages, setAssistantMessages] = useState([]);
   const [assistantHistory, setAssistantHistory] = useState([]);
   const [assistantPending, setAssistantPending] = useState(false);
+  const [assistantStatus, setAssistantStatus] = useState("");
 
   const visibleOpps = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -496,8 +560,70 @@ function App({ initialOpportunities = [], userId, userEmail, initialError = "" }
 
   const sendAssistantMessage = async (message) => {
     const userMessage = { id: crypto.randomUUID(), role: "user", content: message };
-    setAssistantMessages((list) => [...list, userMessage]);
+    const assistantId = crypto.randomUUID();
+    let streamedText = "";
+
+    const updateAssistantMessage = (edits) => {
+      setAssistantMessages((list) => list.map((item) => item.id === assistantId ? { ...item, ...edits } : item));
+    };
+
+    const appendAssistantText = (text) => {
+      streamedText += text;
+      setAssistantMessages((list) => list.map((item) => (
+        item.id === assistantId ? { ...item, content: `${item.content || ""}${text}` } : item
+      )));
+    };
+
+    const upsertToolCall = (tool) => {
+      setAssistantMessages((list) => list.map((item) => {
+        if (item.id !== assistantId) return item;
+
+        const tools = Array.isArray(item.tools) ? item.tools : [];
+        const index = tools.findIndex((existing) => existing.id === tool.id);
+        const nextTool = { ...tool, updatedAt: Date.now() };
+
+        if (index === -1) return { ...item, tools: [...tools, nextTool] };
+
+        return {
+          ...item,
+          tools: tools.map((existing, existingIndex) => existingIndex === index ? { ...existing, ...nextTool } : existing),
+        };
+      }));
+    };
+
+    const handleStreamEvent = (event) => {
+      if (event.type === "delta" && event.text) {
+        appendAssistantText(String(event.text));
+        return;
+      }
+
+      if (event.type === "tool") {
+        upsertToolCall(event);
+        if (event.message) setAssistantStatus(String(event.message));
+        return;
+      }
+
+      if (event.type === "status" && event.message) {
+        setAssistantStatus(String(event.message));
+        return;
+      }
+
+      if (event.type === "final") {
+        setAssistantHistory(event.history || []);
+        if (Array.isArray(event.opportunities)) setOpps(event.opportunities);
+        if (!streamedText.trim()) updateAssistantMessage({ content: String(event.output || "Done.") });
+        setAssistantStatus("");
+        return;
+      }
+
+      if (event.type === "error") {
+        throw new Error(event.error || "Assistant failed.");
+      }
+    };
+
+    setAssistantMessages((list) => [...list, userMessage, { id: assistantId, role: "assistant", content: "" }]);
     setAssistantPending(true);
+    setAssistantStatus("Coda is thinking…");
     setDataError("");
 
     try {
@@ -507,25 +633,48 @@ function App({ initialOpportunities = [], userId, userEmail, initialError = "" }
         body: JSON.stringify({ message, history: assistantHistory }),
       });
 
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Assistant failed.");
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type") || "";
+        let errorMessage = "Assistant failed.";
+        if (contentType.includes("application/json")) {
+          const payload = await response.json();
+          errorMessage = payload?.error || errorMessage;
+        } else {
+          errorMessage = await response.text() || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
 
-      setAssistantHistory(payload.history || []);
-      if (Array.isArray(payload.opportunities)) setOpps(payload.opportunities);
-      setAssistantMessages((list) => [...list, {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: String(payload.output || "Done."),
-      }]);
+      if (!response.body) throw new Error("Assistant response did not include a stream.");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          handleStreamEvent(JSON.parse(line));
+        }
+      }
+
+      buffer += decoder.decode();
+      if (buffer.trim()) handleStreamEvent(JSON.parse(buffer));
     } catch (error) {
-      setAssistantMessages((list) => [...list, {
-        id: crypto.randomUUID(),
-        role: "assistant",
+      updateAssistantMessage({
         content: error.message || "Assistant failed.",
         error: true,
-      }]);
+      });
     } finally {
       setAssistantPending(false);
+      setAssistantStatus("");
     }
   };
 
@@ -546,7 +695,7 @@ function App({ initialOpportunities = [], userId, userEmail, initialError = "" }
           {view === "calendar" && (query && opps.length && !visibleOpps.length ? <SmallEmpty title="No matching deadlines" body="Clear search or try a different term." /> : <CalendarView opps={visibleOpps} onOpen={setDetail} />)}
           {view === "gallery" && (query && opps.length && !visibleOpps.length ? <SmallEmpty title="No matching opportunities" body="Clear search or try a different term." /> : <GalleryView opps={visibleOpps} onOpen={setDetail} />)}
           {view === "discover" && <EmptyView view={view} />}
-          {view === "assistant" && <AssistantView messages={assistantMessages} pending={assistantPending} onSend={sendAssistantMessage} />}
+          {view === "assistant" && <AssistantView messages={assistantMessages} pending={assistantPending} status={assistantStatus} onSend={sendAssistantMessage} />}
         </div>
       </main>
       {adding && <AddDialog onClose={() => setAdding(false)} onCreate={createOpp} />}
