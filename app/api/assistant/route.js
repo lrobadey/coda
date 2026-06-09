@@ -105,6 +105,25 @@ function formatToolResult(name, output) {
 function getTextDelta(event) {
   if (!event || typeof event !== "object") return "";
   if (event.type === "output_text_delta" && typeof event.delta === "string") return event.delta;
+  if (event.type === "response.output_text.delta" && typeof event.delta === "string") return event.delta;
+  return "";
+}
+
+function getReasoningSummaryDelta(event) {
+  if (!event || typeof event !== "object") return "";
+  const data = event.event || event;
+  if (data.type === "response.reasoning_summary_text.delta" && typeof data.delta === "string") {
+    return data.delta;
+  }
+  return "";
+}
+
+function getReasoningSummaryDone(event) {
+  if (!event || typeof event !== "object") return "";
+  const data = event.event || event;
+  if (data.type === "response.reasoning_summary_text.done" && typeof data.text === "string") {
+    return data.text;
+  }
   return "";
 }
 
@@ -206,6 +225,13 @@ export async function POST(request) {
             if (event.type === "raw_model_stream_event") {
               const delta = getTextDelta(event.data);
               if (delta) send({ type: "delta", text: delta });
+
+              const reasoningDelta = getReasoningSummaryDelta(event.data);
+              if (reasoningDelta) send({ type: "reasoning_delta", text: reasoningDelta });
+
+              const reasoningDone = getReasoningSummaryDone(event.data);
+              if (reasoningDone) send({ type: "reasoning_done", text: reasoningDone });
+
               continue;
             }
 
