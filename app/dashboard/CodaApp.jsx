@@ -518,48 +518,95 @@ function ReasoningSummaryCard({ summary, active }) {
   );
 }
 
-function ToolCallCard({ tool }) {
+function toolAccent(status) {
+  if (status === "completed") return "var(--good)";
+  if (status === "waiting") return "var(--warn)";
+  return "var(--accent-bright)";
+}
+
+function ToolActivityRow({ tool }) {
   const done = tool.status === "completed";
   const waiting = tool.status === "waiting";
+  const running = !done && !waiting;
+  const accent = toolAccent(tool.status);
   const icon = done ? "check" : waiting ? "clock" : tool.icon || "sparkle";
-  const accent = done ? "var(--good)" : waiting ? "var(--warn)" : "var(--accent-bright)";
-  const result = tool.result || tool.action || tool.message;
+  const detail = tool.result || tool.action || tool.message;
+
+  return (
+    <div className="row gap8 fade" style={{ alignItems: "flex-start", padding: "5px 0" }}>
+      <span style={{
+        width: 20,
+        height: 20,
+        borderRadius: 7,
+        display: "grid",
+        placeItems: "center",
+        flex: "none",
+        marginTop: 1,
+        color: accent,
+        background: `color-mix(in oklch, ${accent} 14%, transparent)`,
+      }}>
+        <Icon name={icon} size={12} stroke={accent} sw={2.2} />
+      </span>
+      <span className="col grow" style={{ gap: 1, minWidth: 0 }}>
+        <span className="disp" style={{ fontSize: 12.5, fontWeight: 700, color: running ? "var(--tx)" : "var(--tx-2)" }}>
+          {tool.label || "Coda tool"}
+          {running && <span className="tx3" style={{ fontWeight: 500 }}> — {tool.message || "running…"}</span>}
+        </span>
+        {detail && (done || waiting) && (
+          <span className="tx3" style={{ fontSize: 12, lineHeight: 1.4, overflowWrap: "anywhere" }}>{detail}</span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+function ToolActivityCard({ tools }) {
+  const [expanded, setExpanded] = useState(false);
+  const active = tools.some((tool) => tool.status !== "completed");
+  const runningTool = tools.find((tool) => tool.status !== "completed" && tool.status !== "waiting");
+  const accent = active ? "var(--accent-bright)" : "var(--good)";
+  const count = tools.length;
+  const headline = active
+    ? (runningTool ? `${runningTool.label || "Coda tool"} — ${runningTool.message || "running…"}` : "Waiting for confirmation…")
+    : `${count} step${count === 1 ? "" : "s"} completed`;
+  const showRows = active || expanded;
 
   return (
     <div className="fade" style={{
-      padding: 3,
-      borderRadius: 16,
-      background: `linear-gradient(135deg, color-mix(in oklch, ${accent} 45%, transparent), var(--border), transparent)`,
-      maxWidth: 520,
+      width: "min(540px, 100%)",
+      padding: 1,
+      borderRadius: 15,
+      background: active
+        ? `linear-gradient(135deg, color-mix(in oklch, ${accent} 38%, transparent), var(--hairline), transparent)`
+        : "var(--hairline)",
+      opacity: active ? 1 : .86,
     }}>
-      <div className="row gap10" style={{
+      <div className="col" style={{
+        gap: showRows ? 6 : 0,
         padding: "10px 12px",
-        borderRadius: 13,
-        background: "linear-gradient(180deg, var(--surface-2), var(--surface))",
+        borderRadius: 14,
+        background: "linear-gradient(180deg, color-mix(in oklch, var(--surface-2) 88%, transparent), var(--bg-2))",
         border: "1px solid var(--hairline)",
-        boxShadow: "inset 0 1px 0 oklch(1 0 0 / 0.08)",
-        alignItems: "flex-start",
+        borderLeft: `3px solid ${accent}`,
       }}>
-        <span style={{
-          width: 30,
-          height: 30,
-          borderRadius: 11,
-          display: "grid",
-          placeItems: "center",
-          flex: "none",
-          color: accent,
-          background: `color-mix(in oklch, ${accent} 15%, transparent)`,
-          border: `1px solid color-mix(in oklch, ${accent} 34%, transparent)`,
-        }}>
-          <Icon name={icon} size={15} stroke={accent} sw={2} />
-        </span>
-        <span className="col grow" style={{ gap: 4 }}>
-          <span className="row gap8 between">
-            <span className="disp" style={{ fontSize: 13.5, fontWeight: 700 }}>{tool.label || "Coda tool"}</span>
-            <span className="label" style={{ color: accent }}>{done ? "done" : waiting ? "waiting" : "running"}</span>
+        <div className="row gap8 between">
+          <span className="row gap8" style={{ color: active ? accent : "var(--tx-3)", minWidth: 0 }}>
+            <Icon name={active ? "sparkle" : "check"} size={14} stroke="currentColor" sw={2} />
+            <span className="disp" style={{ fontSize: 12.5, fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {headline}
+            </span>
           </span>
-          <span className="tx3" style={{ fontSize: 12.5, lineHeight: 1.35 }}>{result}</span>
-        </span>
+          {!active && (
+            <button type="button" className="btn ghost sm" onClick={() => setExpanded((v) => !v)} style={{ padding: "2px 6px", fontSize: 11.5, flex: "none" }}>
+              {expanded ? "Hide" : "Show"}
+            </button>
+          )}
+        </div>
+        {showRows && (
+          <div className="col" style={{ borderTop: "1px solid var(--hairline)", paddingTop: 4 }}>
+            {tools.map((tool) => <ToolActivityRow key={tool.id || `${tool.name}-${tool.status}`} tool={tool} />)}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -608,11 +655,7 @@ function AssistantView({ messages, pending, status, onSend, isMobile }) {
               <div key={message.id} className="col" style={{ alignItems: isUser ? "flex-end" : "flex-start" }}>
                 <div className="col gap8" style={{ alignItems: isUser ? "flex-end" : "flex-start", maxWidth: "min(680px, 88%)" }}>
                   {hasReasoning && <ReasoningSummaryCard summary={message.reasoningSummary} active={Boolean(message.thinking)} />}
-                  {hasTools && (
-                    <div className="col gap8" style={{ width: "min(540px, 100%)" }}>
-                      {message.tools.map((tool) => <ToolCallCard key={tool.id || `${tool.name}-${tool.status}`} tool={tool} />)}
-                    </div>
-                  )}
+                  {hasTools && <ToolActivityCard tools={message.tools} />}
                   {showBubble && (
                     <div className="card fade" style={{
                       padding: "12px 14px",
