@@ -60,3 +60,52 @@ create trigger set_opportunities_updated_at
 before update on public.opportunities
 for each row
 execute function public.set_updated_at();
+
+create table if not exists public.artist_profiles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null unique references auth.users(id) on delete cascade,
+  full_name text,
+  discipline text,
+  birthdate date,
+  bio text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.artist_profiles enable row level security;
+
+drop policy if exists "Users can read own artist profile" on public.artist_profiles;
+drop policy if exists "Users can insert own artist profile" on public.artist_profiles;
+drop policy if exists "Users can update own artist profile" on public.artist_profiles;
+drop policy if exists "Users can delete own artist profile" on public.artist_profiles;
+
+create policy "Users can read own artist profile"
+on public.artist_profiles
+for select
+to authenticated
+using (auth.uid() = user_id);
+
+create policy "Users can insert own artist profile"
+on public.artist_profiles
+for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+create policy "Users can update own artist profile"
+on public.artist_profiles
+for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "Users can delete own artist profile"
+on public.artist_profiles
+for delete
+to authenticated
+using (auth.uid() = user_id);
+
+drop trigger if exists set_artist_profiles_updated_at on public.artist_profiles;
+create trigger set_artist_profiles_updated_at
+before update on public.artist_profiles
+for each row
+execute function public.set_updated_at();

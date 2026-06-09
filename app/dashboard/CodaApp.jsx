@@ -17,6 +17,7 @@ const VIEWS = [
   { id: "gallery", label: "Gallery", icon: "grid", group: "Tracker" },
   { id: "discover", label: "Discover", icon: "compass", group: "AI" },
   { id: "assistant", label: "Assistant", icon: "message", group: "AI" },
+  { id: "artist_profile", label: "Artist Profile", icon: "user", group: "AI" },
 ];
 
 const VIEW_TITLE = {
@@ -25,6 +26,7 @@ const VIEW_TITLE = {
   gallery: { t: "All opportunities", s: "Your full tracked library" },
   discover: { t: "Discover", s: "Suggested · confirm to track" },
   assistant: { t: "Assistant", s: "Find, organize, and draft with Coda" },
+  artist_profile: { t: "Artist Profile", s: "Tell Coda who you are as an artist" },
 };
 
 function daysUntil(iso) {
@@ -52,6 +54,7 @@ function Icon({ name, size = 18, stroke = "currentColor", sw = 1.9, fill = "none
     grid: <g {...p}><rect x="3.5" y="3.5" width="5.5" height="5.5" rx="1" /><rect x="11" y="3.5" width="5.5" height="5.5" rx="1" /><rect x="3.5" y="11" width="5.5" height="5.5" rx="1" /><rect x="11" y="11" width="5.5" height="5.5" rx="1" /></g>,
     compass: <g {...p}><circle cx="10" cy="10" r="7" /><path d="M13.2 6.8 L8.4 8.4 L6.8 13.2 L11.6 11.6 Z" /></g>,
     message: <g {...p}><path d="M4 4.5 H16 V13 H9 L5.5 16 V13 H4 Z" /></g>,
+    user: <g {...p}><circle cx="10" cy="7" r="3" /><path d="M4.5 16 C5.5 12.8 7.5 11.5 10 11.5 C12.5 11.5 14.5 12.8 15.5 16" /></g>,
     bell: <g {...p}><path d="M6 9 a4 4 0 0 1 8 0 c0 3 1 4 1.5 4.7 H4.5 C5 13 6 12 6 9 Z M8.5 16 a1.6 1.6 0 0 0 3 0" /></g>,
     settings: <g {...p}><circle cx="10" cy="10" r="2.4" /><path d="M10 3 V5 M10 15 V17 M3 10 H5 M15 10 H17 M5.2 5.2 L6.6 6.6 M13.4 13.4 L14.8 14.8 M14.8 5.2 L13.4 6.6 M6.6 13.4 L5.2 14.8" /></g>,
     doc: <g {...p}><path d="M5.5 3.5 H12 L15 6.5 V16.5 H5.5 Z M12 3.5 V6.5 H15 M7.5 10 H12.5 M7.5 13 H12.5" /></g>,
@@ -106,19 +109,22 @@ function Sidebar({ view, setView, userEmail }) {
 
 function Header({ view, count, query, setQuery, onAdd }) {
   const vt = VIEW_TITLE[view];
+  const isProfile = view === "artist_profile";
   return (
     <header className="row between" style={{ padding: "16px 28px 14px", flex: "none", borderBottom: "1px solid var(--border)" }}>
       <div className="col" style={{ gap: 3 }}>
         <div className="disp" style={{ fontSize: 20, fontWeight: 700 }}>{vt.t}</div>
-        <div className="tx3" style={{ fontSize: 12.5 }}>{count} tracked · {vt.s}</div>
+        <div className="tx3" style={{ fontSize: 12.5 }}>{isProfile ? vt.s : `${count} tracked · ${vt.s}`}</div>
       </div>
       <div className="row gap10">
-        <div className="row gap8" style={{ background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px", width: 180 }}>
-          <Icon name="search" size={15} stroke="var(--tx-4)" />
-          <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" style={{ border: "none", background: "transparent", padding: 0, fontSize: 13 }} />
-        </div>
+        {!isProfile && (
+          <div className="row gap8" style={{ background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px", width: 180 }}>
+            <Icon name="search" size={15} stroke="var(--tx-4)" />
+            <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" style={{ border: "none", background: "transparent", padding: 0, fontSize: 13 }} />
+          </div>
+        )}
         <button className="btn ghost" style={{ padding: 9 }}><Icon name="bell" size={17} /></button>
-        <button className="btn primary" onClick={onAdd}><Icon name="plus" size={15} stroke="#fff" /> Add</button>
+        {!isProfile && <button className="btn primary" onClick={onAdd}><Icon name="plus" size={15} stroke="#fff" /> Add</button>}
       </div>
     </header>
   );
@@ -383,6 +389,97 @@ function AssistantView({ messages, pending, status, onSend }) {
   );
 }
 
+function wordCount(text) {
+  return text.trim() ? text.trim().split(/\s+/).length : 0;
+}
+
+function calculateAge(birthdate) {
+  if (!birthdate) return null;
+  const born = new Date(birthdate + "T00:00:00");
+  if (Number.isNaN(born.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - born.getFullYear();
+  const hadBirthday = today.getMonth() > born.getMonth() || (today.getMonth() === born.getMonth() && today.getDate() >= born.getDate());
+  if (!hadBirthday) age -= 1;
+  return age >= 0 ? age : null;
+}
+
+function ArtistProfileView({ profile, onSave }) {
+  const [form, setForm] = useState({
+    full_name: profile?.full_name || "",
+    discipline: profile?.discipline || "",
+    birthdate: profile?.birthdate || "",
+    bio: profile?.bio || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const words = wordCount(form.bio);
+  const age = calculateAge(form.birthdate);
+  const set = (key, value) => {
+    if (key === "bio" && wordCount(value) > 150) return;
+    setForm((f) => ({ ...f, [key]: value }));
+  };
+  const submit = async (e) => {
+    e.preventDefault();
+    if (saving || words > 150) return;
+    setSaving(true);
+    await onSave({
+      full_name: form.full_name.trim(),
+      discipline: form.discipline.trim(),
+      birthdate: form.birthdate || null,
+      bio: form.bio.trim(),
+    });
+    setSaving(false);
+  };
+
+  return (
+    <div style={{ height: "100%", overflow: "auto", padding: "8px 28px 28px" }}>
+      <form onSubmit={submit} className="card col gap14" style={{ width: "min(720px, 100%)", padding: 20, background: "linear-gradient(180deg, var(--surface), var(--bg-2))" }}>
+        <div className="row gap10" style={{ alignItems: "flex-start" }}>
+          <span style={{ width: 38, height: 38, borderRadius: 14, display: "grid", placeItems: "center", background: "var(--accent-soft)", border: "1px solid var(--accent-line)" }}>
+            <Icon name="user" size={18} stroke="var(--accent-bright)" />
+          </span>
+          <div className="col" style={{ gap: 5 }}>
+            <div className="disp" style={{ fontSize: 18, fontWeight: 750 }}>Your artist identity</div>
+            <div className="tx3" style={{ fontSize: 13, lineHeight: 1.4 }}>This helps Coda tailor opportunities, drafts, and recommendations.</div>
+          </div>
+        </div>
+
+        <div className="hr" />
+
+        <div className="col gap8">
+          <div className="label">Full name</div>
+          <input className="input" value={form.full_name} onChange={(e) => set("full_name", e.target.value)} placeholder="Your full name" />
+        </div>
+        <div className="col gap8">
+          <div className="label">Discipline</div>
+          <input className="input" value={form.discipline} onChange={(e) => set("discipline", e.target.value)} placeholder="Painter, dancer, filmmaker…" />
+        </div>
+        <div className="col gap8">
+          <div className="row between">
+            <div className="label">Birthdate</div>
+            {age !== null && <div className="tx3" style={{ fontSize: 12.5 }}>Age {age}</div>}
+          </div>
+          <input className="input" type="date" value={form.birthdate} onChange={(e) => set("birthdate", e.target.value)} max={new Date().toISOString().slice(0, 10)} />
+        </div>
+        <div className="col gap8">
+          <div className="row between">
+            <div className="label">Bio</div>
+            <div className={words > 150 ? "" : "tx3"} style={{ fontSize: 12.5, color: words > 150 ? "var(--warn)" : undefined }}>{words} / 150 words</div>
+          </div>
+          <textarea className="input" value={form.bio} onChange={(e) => set("bio", e.target.value)} placeholder="A short artist bio…" rows={7} style={{ resize: "vertical", lineHeight: 1.45 }} />
+        </div>
+
+        <div className="row between gap10" style={{ marginTop: 4 }}>
+          <div className="tx3" style={{ fontSize: 12.5 }}>Saved privately to your account.</div>
+          <button className="btn primary" disabled={saving || words > 150} style={{ opacity: saving || words > 150 ? .6 : 1 }}>
+            <Icon name="check" size={15} stroke="#fff" /> {saving ? "Saving…" : "Save profile"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function AddDialog({ onClose, onCreate }) {
   const [form, setForm] = useState({ title: "", org: "", deadline: "", stage: "found" });
   const [saving, setSaving] = useState(false);
@@ -455,10 +552,11 @@ function DetailDrawer({ opp, onClose, onUpdate, onDelete }) {
   );
 }
 
-function App({ initialOpportunities = [], userId, userEmail, initialError = "" }) {
+function App({ initialOpportunities = [], initialArtistProfile = null, userId, userEmail, initialError = "" }) {
   const supabase = createClient();
   const [view, setView] = useState("board");
   const [opps, setOpps] = useState(initialOpportunities);
+  const [artistProfile, setArtistProfile] = useState(initialArtistProfile);
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
   const [detail, setDetail] = useState(null);
@@ -558,6 +656,24 @@ function App({ initialOpportunities = [], userId, userEmail, initialError = "" }
     }
   };
 
+  const saveArtistProfile = async (profile) => {
+    setDataError("");
+    const payload = { ...profile, user_id: userId, updated_at: new Date().toISOString() };
+
+    const { data, error } = await supabase
+      .from("artist_profiles")
+      .upsert(payload, { onConflict: "user_id" })
+      .select()
+      .single();
+
+    if (error) {
+      setDataError(error.message);
+      return;
+    }
+
+    setArtistProfile(data);
+  };
+
   const sendAssistantMessage = async (message) => {
     const userMessage = { id: crypto.randomUUID(), role: "user", content: message };
     const assistantId = crypto.randomUUID();
@@ -651,22 +767,27 @@ function App({ initialOpportunities = [], userId, userEmail, initialError = "" }
       const decoder = new TextDecoder();
       let buffer = "";
 
+      const processStreamBuffer = (flush = false) => {
+        const lines = buffer.split("\n");
+        buffer = flush ? "" : lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          handleStreamEvent(JSON.parse(trimmed));
+        }
+      };
+
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          handleStreamEvent(JSON.parse(line));
-        }
+        processStreamBuffer(false);
       }
 
       buffer += decoder.decode();
-      if (buffer.trim()) handleStreamEvent(JSON.parse(buffer));
+      processStreamBuffer(true);
     } catch (error) {
       updateAssistantMessage({
         content: error.message || "Assistant failed.",
@@ -696,6 +817,7 @@ function App({ initialOpportunities = [], userId, userEmail, initialError = "" }
           {view === "gallery" && (query && opps.length && !visibleOpps.length ? <SmallEmpty title="No matching opportunities" body="Clear search or try a different term." /> : <GalleryView opps={visibleOpps} onOpen={setDetail} />)}
           {view === "discover" && <EmptyView view={view} />}
           {view === "assistant" && <AssistantView messages={assistantMessages} pending={assistantPending} status={assistantStatus} onSend={sendAssistantMessage} />}
+          {view === "artist_profile" && <ArtistProfileView profile={artistProfile} onSave={saveArtistProfile} />}
         </div>
       </main>
       {adding && <AddDialog onClose={() => setAdding(false)} onCreate={createOpp} />}
