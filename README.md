@@ -1,10 +1,26 @@
 # Coda MVP
 
-Minimal static MVP foundation for Coda.
+A minimal static prototype for Coda, an opportunity tracker.
+
+## Current status
+
+This is an early UI shell only:
+
+- Static React app loaded from CDNs
+- No backend, auth, database, or persistence
+- No real AI integration yet
+- Board, navigation, header, and empty states are present
+
+## Files
+
+- `index.html` — app entry point
+- `app.jsx` — React UI
+- `theme.css` — app styling
+- `vercel.json` — static Vercel config
 
 ## Local preview
 
-Open `index.html` directly, or run:
+Open `index.html` directly in a browser, or run:
 
 ```bash
 npx vercel dev
@@ -12,4 +28,4 @@ npx vercel dev
 
 ## Deploy
 
-This folder is configured as a static Vercel project. Import the GitHub repo in Vercel and use the repository root as the project root.
+Import this repository into Vercel and use the repository root as the project root.

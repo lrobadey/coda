@@ -44,7 +44,7 @@ function Icon({ name, size = 18, stroke = "currentColor", sw = 1.9, fill = "none
   return <svg width={size} height={size} viewBox="0 0 20 20" style={{ flex: "none", ...style }}>{paths[name] || null}</svg>;
 }
 
-function NavItem({ icon, label, active, onClick, badge }) {
+function NavItem({ icon, label, active, onClick }) {
   return (
     <button onClick={onClick} className="row gap10 between"
       style={{ width: "100%", textAlign: "left", cursor: "pointer", padding: "9px 11px", borderRadius: 10,
@@ -57,9 +57,6 @@ function NavItem({ icon, label, active, onClick, badge }) {
         <Icon name={icon} size={17} stroke={active ? "var(--accent-bright)" : "var(--tx-3)"} sw={1.8} />
         <span style={{ fontSize: 13.5, fontWeight: active ? 600 : 500 }}>{label}</span>
       </span>
-      {badge > 0 && <span className="mono" style={{ fontSize: 10.5, fontWeight: 600, padding: "1px 7px", borderRadius: 20,
-        background: active ? "var(--accent)" : "var(--accent-soft)", color: active ? "#fff" : "var(--accent-bright)",
-        border: "1px solid var(--accent-line)" }}>{badge}</span>}
     </button>
   );
 }
@@ -85,7 +82,7 @@ function Sidebar({ view, setView }) {
       <div className="hr" style={{ margin: "14px 6px" }} />
 
       <div className="col gap2" style={{ gap: 2 }}>
-        {ai.map((v) => <NavItem key={v.id} {...v} active={view === v.id} onClick={() => setView(v.id)} badge={0} />)}
+        {ai.map((v) => <NavItem key={v.id} {...v} active={view === v.id} onClick={() => setView(v.id)} />)}
       </div>
 
       <div className="grow" />
