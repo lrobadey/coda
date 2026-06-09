@@ -1,0 +1,9 @@
+{
+  "name": "coda-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal static MVP foundation for Coda.",
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}
