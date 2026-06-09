@@ -197,7 +197,17 @@ export async function POST(request) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
-    const agent = createCodaAgent({ supabase, userId: user.id });
+    const { data: artistProfile, error: profileError } = await supabase
+      .from("artist_profiles")
+      .select("full_name,discipline,birthdate,bio")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.warn("Could not load artist profile for assistant", profileError.message);
+    }
+
+    const agent = createCodaAgent({ supabase, userId: user.id, artistProfile: artistProfile || null });
     const input = [
       ...history,
       { role: "user", content: message },
