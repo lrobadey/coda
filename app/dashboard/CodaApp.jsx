@@ -388,9 +388,8 @@ function ReasoningSummaryCard({ summary, active }) {
             fontSize: 12.8,
             lineHeight: 1.45,
             fontStyle: "italic",
-            whiteSpace: "pre-wrap",
           }}>
-            {text}
+            <MarkdownText text={text} />
           </div>
         )}
       </div>
