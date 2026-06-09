@@ -7,7 +7,7 @@ import { listOpportunities } from "../../../lib/opportunities";
 export const maxDuration = 60;
 
 const STAGE_LABELS = {
-  found: "Discovered",
+  found: "Saved",
   interested: "Interested",
   in_progress: "Ongoing",
   submitted: "Submitted",

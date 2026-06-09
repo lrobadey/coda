@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
 
 const STAGES = [
-  { id: "found", label: "Discovered", color: "var(--tx-3)" },
+  { id: "found", label: "Saved", color: "var(--tx-3)" },
   { id: "interested", label: "Interested", color: "var(--accent)" },
   { id: "in_progress", label: "Ongoing", color: "var(--warn)" },
   { id: "submitted", label: "Submitted", color: "oklch(0.72 0.13 230)" },
@@ -58,7 +58,7 @@ function daysUntil(iso) {
 }
 
 function stageLabel(id) {
-  return STAGES.find((s) => s.id === id)?.label || "Discovered";
+  return STAGES.find((s) => s.id === id)?.label || "Saved";
 }
 
 function Icon({ name, size = 18, stroke = "currentColor", sw = 1.9, fill = "none", style }) {
