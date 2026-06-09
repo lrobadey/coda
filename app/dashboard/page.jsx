@@ -15,7 +15,7 @@ export default async function DashboardPage() {
 
   const { data, error } = await supabase
     .from("opportunities")
-    .select("id,user_id,title,org,deadline,stage,source_url,notes,created_at,updated_at")
+    .select("id,user_id,title,org,deadline,stage,status,source_url,notes,created_at,updated_at")
     .order("created_at", { ascending: true });
 
   const { data: artistProfile, error: profileError } = await supabase
