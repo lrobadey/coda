@@ -1,5 +1,6 @@
-/* global React, ReactDOM */
-const { useMemo, useState } = React;
+"use client";
+
+import { useMemo, useState } from "react";
 
 const STAGES = [
   { id: "found", label: "Found it", color: "var(--tx-3)" },
@@ -345,4 +346,4 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+export default App;

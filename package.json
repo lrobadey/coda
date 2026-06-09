@@ -2,8 +2,15 @@
   "name": "coda-mvp",
   "version": "0.1.0",
   "private": true,
-  "description": "Minimal static MVP foundation for Coda.",
+  "description": "MVP foundation for Coda.",
   "scripts": {
-    "dev": "vercel dev"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^16.2.7",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }
