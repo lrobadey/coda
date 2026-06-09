@@ -255,6 +255,57 @@ function EmptyView({ view }) {
   );
 }
 
+function ReasoningSummaryCard({ summary, active }) {
+  const [expanded, setExpanded] = useState(true);
+  const text = summary?.trim() || "Coda is gathering its thoughts…";
+  const showText = active || expanded;
+
+  return (
+    <div className="fade" style={{
+      width: "min(540px, 100%)",
+      padding: 1,
+      borderRadius: 15,
+      background: active
+        ? "linear-gradient(135deg, color-mix(in oklch, var(--accent-bright) 38%, transparent), var(--hairline), transparent)"
+        : "var(--hairline)",
+      opacity: active ? 1 : .86,
+    }}>
+      <div className="col" style={{
+        gap: showText ? 7 : 0,
+        padding: "10px 12px",
+        borderRadius: 14,
+        background: "linear-gradient(180deg, color-mix(in oklch, var(--surface-2) 88%, transparent), var(--bg-2))",
+        border: "1px solid var(--hairline)",
+        borderLeft: "3px solid var(--accent-bright)",
+      }}>
+        <div className="row gap8 between">
+          <span className="row gap8" style={{ color: active ? "var(--accent-bright)" : "var(--tx-3)" }}>
+            <Icon name="sparkle" size={14} stroke="currentColor" sw={2} />
+            <span className="disp" style={{ fontSize: 12.5, fontWeight: 750 }}>
+              {active ? "Coda is thinking…" : "Coda’s thinking"}
+            </span>
+          </span>
+          {!active && summary?.trim() && (
+            <button type="button" className="btn ghost sm" onClick={() => setExpanded((v) => !v)} style={{ padding: "2px 6px", fontSize: 11.5 }}>
+              {expanded ? "Hide" : "Show"}
+            </button>
+          )}
+        </div>
+        {showText && (
+          <div className="tx3" style={{
+            fontSize: 12.8,
+            lineHeight: 1.45,
+            fontStyle: "italic",
+            whiteSpace: "pre-wrap",
+          }}>
+            {text}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ToolCallCard({ tool }) {
   const done = tool.status === "completed";
   const waiting = tool.status === "waiting";
@@ -338,11 +389,13 @@ function AssistantView({ messages, pending, status, onSend }) {
           {messages.map((message) => {
             const isUser = message.role === "user";
             const hasTools = !isUser && Array.isArray(message.tools) && message.tools.length > 0;
-            const showBubble = isUser || message.content || message.error || !hasTools;
+            const hasReasoning = !isUser && (message.thinking || message.reasoningSummary);
+            const showBubble = isUser || message.content || message.error || (!hasTools && !hasReasoning);
 
             return (
               <div key={message.id} className="col" style={{ alignItems: isUser ? "flex-end" : "flex-start" }}>
                 <div className="col gap8" style={{ alignItems: isUser ? "flex-end" : "flex-start", maxWidth: "min(680px, 88%)" }}>
+                  {hasReasoning && <ReasoningSummaryCard summary={message.reasoningSummary} active={Boolean(message.thinking)} />}
                   {hasTools && (
                     <div className="col gap8" style={{ width: "min(540px, 100%)" }}>
                       {message.tools.map((tool) => <ToolCallCard key={tool.id || `${tool.name}-${tool.status}`} tool={tool} />)}
@@ -713,6 +766,20 @@ function App({ initialOpportunities = [], initialArtistProfile = null, userId, u
         return;
       }
 
+      if (event.type === "reasoning_delta" && event.text) {
+        setAssistantMessages((list) => list.map((item) => (
+          item.id === assistantId ? { ...item, reasoningSummary: `${item.reasoningSummary || ""}${String(event.text)}`, thinking: true } : item
+        )));
+        return;
+      }
+
+      if (event.type === "reasoning_done") {
+        setAssistantMessages((list) => list.map((item) => (
+          item.id === assistantId ? { ...item, reasoningSummary: String(event.text || item.reasoningSummary || "") } : item
+        )));
+        return;
+      }
+
       if (event.type === "tool") {
         upsertToolCall(event);
         if (event.message) setAssistantStatus(String(event.message));
@@ -728,6 +795,7 @@ function App({ initialOpportunities = [], initialArtistProfile = null, userId, u
         setAssistantHistory(event.history || []);
         if (Array.isArray(event.opportunities)) setOpps(event.opportunities);
         if (!streamedText.trim()) updateAssistantMessage({ content: String(event.output || "Done.") });
+        updateAssistantMessage({ thinking: false });
         setAssistantStatus("");
         return;
       }
@@ -737,7 +805,7 @@ function App({ initialOpportunities = [], initialArtistProfile = null, userId, u
       }
     };
 
-    setAssistantMessages((list) => [...list, userMessage, { id: assistantId, role: "assistant", content: "" }]);
+    setAssistantMessages((list) => [...list, userMessage, { id: assistantId, role: "assistant", content: "", reasoningSummary: "", thinking: true }]);
     setAssistantPending(true);
     setAssistantStatus("Coda is thinking…");
     setDataError("");
@@ -792,6 +860,7 @@ function App({ initialOpportunities = [], initialArtistProfile = null, userId, u
       updateAssistantMessage({
         content: error.message || "Assistant failed.",
         error: true,
+        thinking: false,
       });
     } finally {
       setAssistantPending(false);
