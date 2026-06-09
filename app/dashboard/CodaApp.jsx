@@ -61,7 +61,7 @@ function Icon({ name, size = 18, stroke = "currentColor", sw = 1.9, fill = "none
 
 function NavItem({ icon, label, active, onClick }) {
   return (
-    <button onClick={onClick} className="row gap10 between"
+    <button type="button" onClick={onClick} className="row gap10 between"
       style={{ width: "100%", textAlign: "left", cursor: "pointer", padding: "9px 11px", borderRadius: 10,
         background: active ? "var(--surface-2)" : "transparent",
         border: "1px solid " + (active ? "var(--border)" : "transparent"),
@@ -159,7 +159,7 @@ function Board({ opps, onOpen, onMove, onAdd }) {
 
 function SmallEmpty({ title, body }) {
   return (
-    <div className="fade" style={{ height: "100%", display: "grid", placeItems: "center", padding: 28 }}>
+    <div style={{ height: "100%", display: "grid", placeItems: "center", padding: 28 }}>
       <div className="card" style={{ width: "min(520px, 100%)", padding: 36, textAlign: "center" }}>
         <Icon name="search" size={26} stroke="var(--accent-bright)" />
         <div className="disp" style={{ fontSize: 18, fontWeight: 600, marginTop: 14 }}>{title}</div>
@@ -182,7 +182,7 @@ function CalendarView({ opps, onOpen }) {
   ];
 
   return (
-    <div className="fade col gap14" style={{ height: "100%", overflow: "auto", padding: "8px 28px 28px" }}>
+    <div className="col gap14" style={{ height: "100%", overflow: "auto", padding: "8px 28px 28px" }}>
       {buckets.map((bucket) => {
         const items = dated.filter((o) => bucket.test(daysUntil(o.deadline)));
         if (!items.length) return null;
@@ -214,7 +214,7 @@ function CalendarView({ opps, onOpen }) {
 function GalleryView({ opps, onOpen }) {
   if (!opps.length) return <EmptyView view="gallery" />;
   return (
-    <div className="fade" style={{ height: "100%", overflow: "auto", padding: "8px 28px 28px" }}>
+    <div style={{ height: "100%", overflow: "auto", padding: "8px 28px 28px" }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
         {opps.map((opp) => (
           <div key={opp.id} className="card" onClick={() => onOpen(opp)} style={{ padding: 16, cursor: "pointer", minHeight: 150 }}>
@@ -237,7 +237,7 @@ function EmptyView({ view }) {
     assistant: ["Ask Coda anything", "Search for opportunities, extract requirements, or draft materials."],
   }[view];
   return (
-    <div className="fade" style={{ height: "100%", display: "grid", placeItems: "center", padding: 28 }}>
+    <div style={{ height: "100%", display: "grid", placeItems: "center", padding: 28 }}>
       <div className="card" style={{ width: "min(520px, 100%)", padding: 36, textAlign: "center" }}>
         <Icon name={view === "assistant" ? "message" : view === "discover" ? "compass" : "doc"} size={28} stroke="var(--accent-bright)" />
         <div className="disp" style={{ fontSize: 18, fontWeight: 600, marginTop: 14 }}>{empty[0]}</div>

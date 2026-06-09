@@ -52,7 +52,7 @@ body::before {
     radial-gradient(50% 45% at 100% 100%, oklch(0.55 0.13 230 / 0.14), transparent 70%);
 }
 
-#root { position: relative; z-index: 1; height: 100%; }
+#app-root { position: relative; z-index: 1; min-height: 100%; }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 20px; border: 2px solid transparent; background-clip: padding-box; }
