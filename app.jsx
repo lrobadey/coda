@@ -263,19 +263,48 @@ function AddDialog({ onClose, onCreate }) {
   );
 }
 
-function DetailDrawer({ opp, onClose, onMove, onDelete }) {
+function DetailDrawer({ opp, onClose, onUpdate, onDelete }) {
+  const [form, setForm] = useState({ title: opp.title, org: opp.org || "", deadline: opp.deadline || "", stage: opp.stage || "found" });
+  const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const dirty = ["title", "org", "deadline", "stage"].some((key) => form[key] !== (opp[key] || (key === "stage" ? "found" : "")));
+  const save = (e) => {
+    e.preventDefault();
+    if (!form.title.trim()) return;
+    onUpdate(opp.id, { ...form, title: form.title.trim() });
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 10, background: "oklch(0.1 0.01 265 / 0.55)" }} onClick={onClose}>
       <aside className="col" onClick={(e) => e.stopPropagation()} style={{ marginLeft: "auto", width: "min(420px, 100%)", height: "100%", background: "var(--bg)", borderLeft: "1px solid var(--border)", padding: 22, gap: 18 }}>
-        <div className="row between"><div className="disp" style={{ fontSize: 20, fontWeight: 750 }}>{opp.title}</div><button className="btn ghost" style={{ padding: 7 }} onClick={onClose}><Icon name="x" size={15} /></button></div>
-        {opp.org && <div><div className="label">Organization</div><div style={{ marginTop: 6 }}>{opp.org}</div></div>}
-        {opp.deadline && <div><div className="label">Deadline</div><div style={{ marginTop: 6 }}>{opp.deadline}</div></div>}
-        <div>
-          <div className="label" style={{ marginBottom: 8 }}>Stage</div>
-          <div className="col gap8">{STAGES.map((s) => <button key={s.id} className="btn" onClick={() => onMove(opp.id, s.id)} style={{ justifyContent: "space-between", background: opp.stage === s.id ? "var(--surface-3)" : undefined }}><span>{s.label}</span>{opp.stage === s.id && <span className="tx3">current</span>}</button>)}</div>
-        </div>
-        <div className="grow" />
-        <button className="btn ghost" onClick={() => onDelete(opp.id)}><Icon name="trash" size={15} /> Delete</button>
+        <form className="col gap14 grow" onSubmit={save}>
+          <div className="row between">
+            <div className="disp" style={{ fontSize: 20, fontWeight: 750 }}>Edit opportunity</div>
+            <button type="button" className="btn ghost" style={{ padding: 7 }} onClick={onClose}><Icon name="x" size={15} /></button>
+          </div>
+
+          <div className="col gap8">
+            <div className="label">Title</div>
+            <input className="input" value={form.title} onChange={(e) => set("title", e.target.value)} />
+          </div>
+          <div className="col gap8">
+            <div className="label">Organization / source</div>
+            <input className="input" value={form.org} onChange={(e) => set("org", e.target.value)} />
+          </div>
+          <div className="col gap8">
+            <div className="label">Deadline</div>
+            <input className="input" type="date" value={form.deadline} onChange={(e) => set("deadline", e.target.value)} />
+          </div>
+          <div className="col gap8">
+            <div className="label">Stage</div>
+            <select className="input" value={form.stage} onChange={(e) => set("stage", e.target.value)}>{STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
+          </div>
+
+          <div className="grow" />
+          <div className="row between gap10">
+            <button type="button" className="btn ghost" onClick={() => onDelete(opp.id)}><Icon name="trash" size={15} /> Delete</button>
+            <button className="btn primary" disabled={!dirty || !form.title.trim()} style={{ opacity: !dirty || !form.title.trim() ? .55 : 1 }}>Save changes</button>
+          </div>
+        </form>
       </aside>
     </div>
   );
@@ -295,6 +324,7 @@ function App() {
   }, [opps, query]);
 
   const moveOpp = (id, stage) => setOpps((list) => list.map((o) => o.id === id ? { ...o, stage } : o));
+  const updateOpp = (id, edits) => setOpps((list) => list.map((o) => o.id === id ? { ...o, ...edits } : o));
   const deleteOpp = (id) => { setOpps((list) => list.filter((o) => o.id !== id)); setDetail(null); };
 
   return (
@@ -310,7 +340,7 @@ function App() {
         </div>
       </main>
       {adding && <AddDialog onClose={() => setAdding(false)} onCreate={(opp) => { setOpps((list) => [...list, opp]); setAdding(false); setView("board"); }} />}
-      {detail && <DetailDrawer opp={opps.find((o) => o.id === detail.id) || detail} onClose={() => setDetail(null)} onMove={moveOpp} onDelete={deleteOpp} />}
+      {detail && <DetailDrawer opp={opps.find((o) => o.id === detail.id) || detail} onClose={() => setDetail(null)} onUpdate={updateOpp} onDelete={deleteOpp} />}
     </div>
   );
 }
