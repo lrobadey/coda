@@ -45,6 +45,12 @@ const TOOL_META = {
     started: "Deleting opportunity…",
     completed: "Opportunity deleted.",
   },
+  find_artist_opportunities: {
+    label: "Web search",
+    icon: "search",
+    started: "Searching the web…",
+    completed: "Search complete.",
+  },
 };
 
 function parseMaybeJson(value) {
@@ -85,6 +91,10 @@ function formatToolAction(name, args = {}) {
     return args.confirmed ? "Deleting a confirmed opportunity" : "Checking delete confirmation";
   }
 
+  if (name === "find_artist_opportunities") {
+    return `Searching for ${args.opportunity_type || "artist opportunities"}${args.location ? ` in ${args.location}` : ""}`;
+  }
+
   return "Using Coda tool";
 }
 
@@ -97,6 +107,9 @@ function formatToolResult(name, output) {
   if (name === "update_opportunity" && output?.title) return `Updated “${output.title}”`;
   if (name === "move_opportunity" && output?.title) return `Moved “${output.title}” to ${formatStage(output.stage)}`;
   if (name === "delete_opportunity" && output?.deleted) return "Deleted the opportunity";
+  if (name === "find_artist_opportunities" && Array.isArray(output?.results)) {
+    return `Found ${output.results.length} web ${output.results.length === 1 ? "result" : "results"}`;
+  }
   if (output?.needs_confirmation) return "Waiting for your confirmation";
 
   return TOOL_META[name]?.completed || "Tool finished";
