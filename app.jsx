@@ -1,5 +1,5 @@
 /* global React, ReactDOM */
-const { useState } = React;
+const { useMemo, useState } = React;
 
 const STAGES = [
   { id: "found", label: "Found it", color: "var(--tx-3)" },
@@ -30,6 +30,8 @@ function Icon({ name, size = 18, stroke = "currentColor", sw = 1.9, fill = "none
   const paths = {
     search: <g {...p}><circle cx="8" cy="8" r="5.2" /><path d="M12.5 12.5 L17 17" /></g>,
     plus: <g {...p}><path d="M10 4 V16 M4 10 H16" /></g>,
+    x: <g {...p}><path d="M5 5 L15 15 M15 5 L5 15" /></g>,
+    trash: <g {...p}><path d="M4 6 H16 M8 6 V4 H12 V6 M6 6 L7 16 H13 L14 6" /></g>,
     board: <g {...p}><rect x="3" y="4" width="4.4" height="12" rx="1" /><rect x="9.3" y="4" width="4.4" height="8" rx="1" /><rect x="15.6" y="4" width="2" height="12" rx="1" /></g>,
     cal: <g {...p}><rect x="3.2" y="4.5" width="13.6" height="12" rx="1.6" /><path d="M3.2 8 H16.8 M7 3 V6 M13 3 V6" /></g>,
     grid: <g {...p}><rect x="3.5" y="3.5" width="5.5" height="5.5" rx="1" /><rect x="11" y="3.5" width="5.5" height="5.5" rx="1" /><rect x="3.5" y="11" width="5.5" height="5.5" rx="1" /><rect x="11" y="11" width="5.5" height="5.5" rx="1" /></g>,
@@ -38,7 +40,7 @@ function Icon({ name, size = 18, stroke = "currentColor", sw = 1.9, fill = "none
     bell: <g {...p}><path d="M6 9 a4 4 0 0 1 8 0 c0 3 1 4 1.5 4.7 H4.5 C5 13 6 12 6 9 Z M8.5 16 a1.6 1.6 0 0 0 3 0" /></g>,
     settings: <g {...p}><circle cx="10" cy="10" r="2.4" /><path d="M10 3 V5 M10 15 V17 M3 10 H5 M15 10 H17 M5.2 5.2 L6.6 6.6 M13.4 13.4 L14.8 14.8 M14.8 5.2 L13.4 6.6 M6.6 13.4 L5.2 14.8" /></g>,
     doc: <g {...p}><path d="M5.5 3.5 H12 L15 6.5 V16.5 H5.5 Z M12 3.5 V6.5 H15 M7.5 10 H12.5 M7.5 13 H12.5" /></g>,
-    sparkle: <g {...p}><path d="M10 3 C10.5 7 11 8 15 9 C11 10 10.5 11 10 15 C9.5 11 9 10 5 9 C9 8 9.5 7 10 3 Z" /><path d="M15.5 3.5 l0.5 1.6 1.6 0.5 -1.6 0.5 -0.5 1.6 -0.5 -1.6 -1.6 -0.5 1.6 -0.5 z" /></g>,
+    sparkle: <g {...p}><path d="M10 3 C10.5 7 11 8 15 9 C11 10 10.5 11 10 15 C9.5 11 9 10 5 9 C9 8 9.5 7 10 3 Z" /></g>,
     coda: <g {...p}><circle cx="10" cy="10" r="5" /><path d="M10 2.4 V17.6 M2.4 10 H17.6" /></g>,
   };
   return <svg width={size} height={size} viewBox="0 0 20 20" style={{ flex: "none", ...style }}>{paths[name] || null}</svg>;
@@ -50,9 +52,7 @@ function NavItem({ icon, label, active, onClick }) {
       style={{ width: "100%", textAlign: "left", cursor: "pointer", padding: "9px 11px", borderRadius: 10,
         background: active ? "var(--surface-2)" : "transparent",
         border: "1px solid " + (active ? "var(--border)" : "transparent"),
-        color: active ? "var(--tx)" : "var(--tx-2)", transition: "background .12s, color .12s" }}
-      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "var(--bg-2)"; }}
-      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+        color: active ? "var(--tx)" : "var(--tx-2)", transition: "background .12s, color .12s" }}>
       <span className="row gap10">
         <Icon name={icon} size={17} stroke={active ? "var(--accent-bright)" : "var(--tx-3)"} sw={1.8} />
         <span style={{ fontSize: 13.5, fontWeight: active ? 600 : 500 }}>{label}</span>
@@ -65,78 +65,77 @@ function Sidebar({ view, setView }) {
   const tracker = VIEWS.filter((v) => v.group === "Tracker");
   const ai = VIEWS.filter((v) => v.group === "AI");
   return (
-    <aside className="col" style={{ width: 240, flex: "none", borderRight: "1px solid var(--border)",
-      background: "var(--bg)", padding: "18px 14px 14px" }}>
+    <aside className="col" style={{ width: 240, flex: "none", borderRight: "1px solid var(--border)", background: "var(--bg)", padding: "18px 14px 14px" }}>
       <div className="row" style={{ padding: "2px 6px 24px", alignItems: "center" }}>
-        <span className="disp" style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.03em",
-          display: "inline-flex", alignItems: "center", lineHeight: 1 }}>
+        <span className="disp" style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.03em", display: "inline-flex", alignItems: "center", lineHeight: 1 }}>
           C<Icon name="coda" size={18} stroke="var(--accent-bright)" sw={2} style={{ margin: "0 -0.5px" }} />da
         </span>
       </div>
-
       <div className="label" style={{ padding: "0 8px 8px" }}>Tracker</div>
-      <div className="col gap2" style={{ gap: 2 }}>
-        {tracker.map((v) => <NavItem key={v.id} {...v} active={view === v.id} onClick={() => setView(v.id)} />)}
-      </div>
-
+      <div className="col" style={{ gap: 2 }}>{tracker.map((v) => <NavItem key={v.id} {...v} active={view === v.id} onClick={() => setView(v.id)} />)}</div>
       <div className="hr" style={{ margin: "14px 6px" }} />
-
-      <div className="col gap2" style={{ gap: 2 }}>
-        {ai.map((v) => <NavItem key={v.id} {...v} active={view === v.id} onClick={() => setView(v.id)} />)}
-      </div>
-
+      <div className="col" style={{ gap: 2 }}>{ai.map((v) => <NavItem key={v.id} {...v} active={view === v.id} onClick={() => setView(v.id)} />)}</div>
       <div className="grow" />
-
       <div className="row gap10" style={{ padding: "6px 6px 0" }}>
         <span style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--surface-3)", border: "1px solid var(--border-2)", display: "grid", placeItems: "center" }} />
-        <div className="col grow" style={{ gap: 5 }}>
-          <span style={{ width: 84, height: 9, borderRadius: 6, background: "var(--surface-3)", display: "block" }} />
-          <span style={{ width: 46, height: 7, borderRadius: 6, background: "var(--surface-2)", display: "block" }} />
-        </div>
+        <div className="col grow" style={{ gap: 5 }}><span style={{ width: 84, height: 9, borderRadius: 6, background: "var(--surface-3)", display: "block" }} /><span style={{ width: 46, height: 7, borderRadius: 6, background: "var(--surface-2)", display: "block" }} /></div>
         <Icon name="settings" size={16} stroke="var(--tx-4)" />
       </div>
     </aside>
   );
 }
 
-function Header({ view }) {
+function Header({ view, count, query, setQuery, onAdd }) {
   const vt = VIEW_TITLE[view];
   return (
     <header className="row between" style={{ padding: "16px 28px 14px", flex: "none", borderBottom: "1px solid var(--border)" }}>
       <div className="col" style={{ gap: 3 }}>
         <div className="disp" style={{ fontSize: 20, fontWeight: 700 }}>{vt.t}</div>
-        <div className="tx3" style={{ fontSize: 12.5 }}>0 tracked · {vt.s}</div>
+        <div className="tx3" style={{ fontSize: 12.5 }}>{count} tracked · {vt.s}</div>
       </div>
       <div className="row gap10">
         <div className="row gap8" style={{ background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px", width: 180 }}>
           <Icon name="search" size={15} stroke="var(--tx-4)" />
-          <input className="input" placeholder="Search…" style={{ border: "none", background: "transparent", padding: 0, fontSize: 13 }} />
+          <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" style={{ border: "none", background: "transparent", padding: 0, fontSize: 13 }} />
         </div>
         <button className="btn ghost" style={{ padding: 9 }}><Icon name="bell" size={17} /></button>
-        <button className="btn primary"><Icon name="plus" size={15} stroke="#fff" /> Add</button>
+        <button className="btn primary" onClick={onAdd}><Icon name="plus" size={15} stroke="#fff" /> Add</button>
       </div>
     </header>
   );
 }
 
-function Board() {
+function OppCard({ opp, onOpen, onDragStart }) {
+  return (
+    <div className="card" draggable onDragStart={onDragStart} onClick={() => onOpen(opp)}
+      style={{ padding: 14, cursor: "pointer", background: "var(--surface-2)" }}>
+      <div className="disp" style={{ fontSize: 14.5, fontWeight: 650, lineHeight: 1.25 }}>{opp.title}</div>
+      {opp.org && <div className="tx3" style={{ fontSize: 12.5, marginTop: 5 }}>{opp.org}</div>}
+      {opp.deadline && <div className="label" style={{ marginTop: 12 }}>Due {opp.deadline}</div>}
+    </div>
+  );
+}
+
+function Board({ opps, onOpen, onMove, onAdd }) {
+  const [dragId, setDragId] = useState(null);
   return (
     <div className="row gap14 astart" style={{ padding: "8px 28px 28px", overflowX: "auto", height: "100%", alignItems: "stretch" }}>
-      {STAGES.map((st) => (
-        <div key={st.id} className="col" style={{ width: 280, flex: "none" }}>
-          <div className="row gap8" style={{ padding: "2px 6px 12px", flex: "none" }}>
-            <span style={{ width: 8, height: 8, borderRadius: 3, flex: "none", background: st.color, boxShadow: `0 0 10px -1px ${st.color}` }} />
-            <span className="disp" style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>{st.label}</span>
-            <span className="mono tx4" style={{ fontSize: 12 }}>0</span>
-          </div>
-          <div className="card col gap10" style={{ padding: 10, flex: 1, minHeight: 140, background: "var(--bg-2)", borderColor: "var(--hairline)" }}>
-            <div className="col center" style={{ alignItems: "center", padding: "26px 6px", gap: 8 }}>
-              <span className="label">drop here</span>
-              <button className="btn sm ghost"><Icon name="plus" size={13} /> Add</button>
+      {STAGES.map((st) => {
+        const items = opps.filter((o) => o.stage === st.id);
+        return (
+          <div key={st.id} className="col" style={{ width: 280, flex: "none" }} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragId) onMove(dragId, st.id); setDragId(null); }}>
+            <div className="row gap8" style={{ padding: "2px 6px 12px", flex: "none" }}>
+              <span style={{ width: 8, height: 8, borderRadius: 3, flex: "none", background: st.color, boxShadow: `0 0 10px -1px ${st.color}` }} />
+              <span className="disp" style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>{st.label}</span>
+              <span className="mono tx4" style={{ fontSize: 12 }}>{items.length}</span>
+            </div>
+            <div className="card col gap10" style={{ padding: 10, flex: 1, minHeight: 140, background: "var(--bg-2)", borderColor: "var(--hairline)" }}>
+              {items.map((opp) => <OppCard key={opp.id} opp={opp} onOpen={onOpen} onDragStart={() => setDragId(opp.id)} />)}
+              {items.length === 0 && <div className="col center" style={{ alignItems: "center", padding: "26px 6px", gap: 8 }}><span className="label">drop here</span><button className="btn sm ghost" onClick={onAdd}><Icon name="plus" size={13} /> Add</button></div>}
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -159,17 +158,73 @@ function EmptyView({ view }) {
   );
 }
 
+function AddDialog({ onClose, onCreate }) {
+  const [form, setForm] = useState({ title: "", org: "", deadline: "", stage: "found" });
+  const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const submit = (e) => {
+    e.preventDefault();
+    if (!form.title.trim()) return;
+    onCreate({ ...form, title: form.title.trim(), id: String(Date.now()) });
+  };
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 10, display: "grid", placeItems: "center", background: "oklch(0.1 0.01 265 / 0.65)", padding: 20 }} onClick={onClose}>
+      <form className="card col gap14" onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{ width: "min(460px, 100%)", padding: 20 }}>
+        <div className="row between"><div className="disp" style={{ fontSize: 18, fontWeight: 700 }}>Add opportunity</div><button type="button" className="btn ghost" style={{ padding: 7 }} onClick={onClose}><Icon name="x" size={15} /></button></div>
+        <input className="input" autoFocus placeholder="Title" value={form.title} onChange={(e) => set("title", e.target.value)} />
+        <input className="input" placeholder="Organization / source" value={form.org} onChange={(e) => set("org", e.target.value)} />
+        <input className="input" type="date" value={form.deadline} onChange={(e) => set("deadline", e.target.value)} />
+        <select className="input" value={form.stage} onChange={(e) => set("stage", e.target.value)}>{STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
+        <button className="btn primary" style={{ justifyContent: "center" }}><Icon name="plus" size={15} stroke="#fff" /> Add opportunity</button>
+      </form>
+    </div>
+  );
+}
+
+function DetailDrawer({ opp, onClose, onMove, onDelete }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 10, background: "oklch(0.1 0.01 265 / 0.55)" }} onClick={onClose}>
+      <aside className="col" onClick={(e) => e.stopPropagation()} style={{ marginLeft: "auto", width: "min(420px, 100%)", height: "100%", background: "var(--bg)", borderLeft: "1px solid var(--border)", padding: 22, gap: 18 }}>
+        <div className="row between"><div className="disp" style={{ fontSize: 20, fontWeight: 750 }}>{opp.title}</div><button className="btn ghost" style={{ padding: 7 }} onClick={onClose}><Icon name="x" size={15} /></button></div>
+        {opp.org && <div><div className="label">Organization</div><div style={{ marginTop: 6 }}>{opp.org}</div></div>}
+        {opp.deadline && <div><div className="label">Deadline</div><div style={{ marginTop: 6 }}>{opp.deadline}</div></div>}
+        <div>
+          <div className="label" style={{ marginBottom: 8 }}>Stage</div>
+          <div className="col gap8">{STAGES.map((s) => <button key={s.id} className="btn" onClick={() => onMove(opp.id, s.id)} style={{ justifyContent: "space-between", background: opp.stage === s.id ? "var(--surface-3)" : undefined }}><span>{s.label}</span>{opp.stage === s.id && <span className="tx3">current</span>}</button>)}</div>
+        </div>
+        <div className="grow" />
+        <button className="btn ghost" onClick={() => onDelete(opp.id)}><Icon name="trash" size={15} /> Delete</button>
+      </aside>
+    </div>
+  );
+}
+
 function App() {
   const [view, setView] = useState("board");
+  const [opps, setOpps] = useState([]);
+  const [query, setQuery] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [detail, setDetail] = useState(null);
+
+  const visibleOpps = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return opps;
+    return opps.filter((o) => [o.title, o.org, o.deadline].some((v) => String(v || "").toLowerCase().includes(q)));
+  }, [opps, query]);
+
+  const moveOpp = (id, stage) => setOpps((list) => list.map((o) => o.id === id ? { ...o, stage } : o));
+  const deleteOpp = (id) => { setOpps((list) => list.filter((o) => o.id !== id)); setDetail(null); };
+
   return (
     <div className="row" style={{ height: "100vh", overflow: "hidden", alignItems: "stretch" }}>
       <Sidebar view={view} setView={setView} />
       <main className="col grow" style={{ height: "100%", minWidth: 0 }}>
-        <Header view={view} />
+        <Header view={view} count={opps.length} query={query} setQuery={setQuery} onAdd={() => setAdding(true)} />
         <div className="grow" style={{ minHeight: 0 }}>
-          {view === "board" ? <Board /> : <EmptyView view={view} />}
+          {view === "board" ? <Board opps={visibleOpps} onOpen={setDetail} onMove={moveOpp} onAdd={() => setAdding(true)} /> : <EmptyView view={view} />}
         </div>
       </main>
+      {adding && <AddDialog onClose={() => setAdding(false)} onCreate={(opp) => { setOpps((list) => [...list, opp]); setAdding(false); setView("board"); }} />}
+      {detail && <DetailDrawer opp={opps.find((o) => o.id === detail.id) || detail} onClose={() => setDetail(null)} onMove={moveOpp} onDelete={deleteOpp} />}
     </div>
   );
 }
