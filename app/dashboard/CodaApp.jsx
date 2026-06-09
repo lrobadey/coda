@@ -247,6 +247,79 @@ function EmptyView({ view }) {
   );
 }
 
+function AssistantView({ messages, pending, onSend }) {
+  const [input, setInput] = useState("");
+  const submit = async (e) => {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || pending) return;
+    setInput("");
+    await onSend(text);
+  };
+
+  return (
+    <div className="col" style={{ height: "100%", padding: "8px 28px 28px", gap: 14 }}>
+      <div className="card col grow" style={{ minHeight: 0, overflow: "hidden", background: "var(--bg-2)" }}>
+        <div className="col grow" style={{ gap: 12, overflow: "auto", padding: 18 }}>
+          {!messages.length && (
+            <div className="card" style={{ padding: 18, background: "var(--surface-2)" }}>
+              <div className="row gap8"><Icon name="sparkle" size={17} stroke="var(--accent-bright)" /><div className="disp" style={{ fontWeight: 700 }}>Coda is ready</div></div>
+              <div className="tx3" style={{ fontSize: 13, marginTop: 8, lineHeight: 1.45 }}>
+                Ask it to add, find, update, move, summarize, or delete opportunities. It uses your signed-in session and the same database rules as the app.
+              </div>
+              <div className="row gap8" style={{ flexWrap: "wrap", marginTop: 14 }}>
+                {[
+                  "Show my upcoming deadlines",
+                  "Add a new internship opportunity",
+                  "Move an opportunity to submitted",
+                ].map((prompt) => (
+                  <button key={prompt} type="button" className="btn sm ghost" disabled={pending} onClick={() => onSend(prompt)}>
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {messages.map((message) => (
+            <div key={message.id} className="col" style={{ alignItems: message.role === "user" ? "flex-end" : "flex-start" }}>
+              <div className="card" style={{
+                maxWidth: "min(680px, 88%)",
+                padding: "12px 14px",
+                background: message.role === "user" ? "var(--accent)" : message.error ? "var(--accent-soft)" : "var(--surface-2)",
+                borderColor: message.error ? "var(--accent-line)" : "var(--border)",
+                color: message.role === "user" ? "#fff" : "var(--tx)",
+                whiteSpace: "pre-wrap",
+                lineHeight: 1.45,
+                fontSize: 14,
+              }}>
+                {message.content}
+              </div>
+            </div>
+          ))}
+          {pending && (
+            <div className="row gap8 tx3" style={{ fontSize: 13, padding: "2px 4px" }}>
+              <Icon name="sparkle" size={15} stroke="var(--accent-bright)" /> Coda is working…
+            </div>
+          )}
+        </div>
+        <form onSubmit={submit} className="row gap10" style={{ padding: 14, borderTop: "1px solid var(--border)" }}>
+          <input
+            className="input"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type a message to Coda…"
+            disabled={pending}
+            autoFocus
+          />
+          <button className="btn primary" disabled={pending || !input.trim()} style={{ opacity: pending || !input.trim() ? .6 : 1 }}>
+            Send
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function AddDialog({ onClose, onCreate }) {
   const [form, setForm] = useState({ title: "", org: "", deadline: "", stage: "found" });
   const [saving, setSaving] = useState(false);
@@ -327,6 +400,9 @@ function App({ initialOpportunities = [], userId, userEmail, initialError = "" }
   const [adding, setAdding] = useState(false);
   const [detail, setDetail] = useState(null);
   const [dataError, setDataError] = useState(initialError);
+  const [assistantMessages, setAssistantMessages] = useState([]);
+  const [assistantHistory, setAssistantHistory] = useState([]);
+  const [assistantPending, setAssistantPending] = useState(false);
 
   const visibleOpps = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -418,6 +494,41 @@ function App({ initialOpportunities = [], userId, userEmail, initialError = "" }
     }
   };
 
+  const sendAssistantMessage = async (message) => {
+    const userMessage = { id: crypto.randomUUID(), role: "user", content: message };
+    setAssistantMessages((list) => [...list, userMessage]);
+    setAssistantPending(true);
+    setDataError("");
+
+    try {
+      const response = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, history: assistantHistory }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Assistant failed.");
+
+      setAssistantHistory(payload.history || []);
+      if (Array.isArray(payload.opportunities)) setOpps(payload.opportunities);
+      setAssistantMessages((list) => [...list, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: String(payload.output || "Done."),
+      }]);
+    } catch (error) {
+      setAssistantMessages((list) => [...list, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: error.message || "Assistant failed.",
+        error: true,
+      }]);
+    } finally {
+      setAssistantPending(false);
+    }
+  };
+
   return (
     <div className="row" style={{ height: "100vh", overflow: "hidden", alignItems: "stretch" }}>
       <Sidebar view={view} setView={setView} userEmail={userEmail} />
@@ -434,7 +545,8 @@ function App({ initialOpportunities = [], userId, userEmail, initialError = "" }
           {view === "board" && <Board opps={visibleOpps} onOpen={setDetail} onMove={moveOpp} onAdd={() => setAdding(true)} />}
           {view === "calendar" && (query && opps.length && !visibleOpps.length ? <SmallEmpty title="No matching deadlines" body="Clear search or try a different term." /> : <CalendarView opps={visibleOpps} onOpen={setDetail} />)}
           {view === "gallery" && (query && opps.length && !visibleOpps.length ? <SmallEmpty title="No matching opportunities" body="Clear search or try a different term." /> : <GalleryView opps={visibleOpps} onOpen={setDetail} />)}
-          {(view === "discover" || view === "assistant") && <EmptyView view={view} />}
+          {view === "discover" && <EmptyView view={view} />}
+          {view === "assistant" && <AssistantView messages={assistantMessages} pending={assistantPending} onSend={sendAssistantMessage} />}
         </div>
       </main>
       {adding && <AddDialog onClose={() => setAdding(false)} onCreate={createOpp} />}
