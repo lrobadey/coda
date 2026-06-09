@@ -45,7 +45,7 @@ const TOOL_META = {
     started: "Deleting opportunity…",
     completed: "Opportunity deleted.",
   },
-  find_artist_opportunities: {
+  web_search: {
     label: "Web search",
     icon: "search",
     started: "Searching the web…",
@@ -91,7 +91,7 @@ function formatToolAction(name, args = {}) {
     return args.confirmed ? "Deleting a confirmed opportunity" : "Checking delete confirmation";
   }
 
-  if (name === "find_artist_opportunities") {
+  if (name === "web_search") {
     return `Searching for ${args.opportunity_type || "artist opportunities"}${args.location ? ` in ${args.location}` : ""}`;
   }
 
@@ -107,7 +107,7 @@ function formatToolResult(name, output) {
   if (name === "update_opportunity" && output?.title) return `Updated “${output.title}”`;
   if (name === "move_opportunity" && output?.title) return `Moved “${output.title}” to ${formatStage(output.stage)}`;
   if (name === "delete_opportunity" && output?.deleted) return "Deleted the opportunity";
-  if (name === "find_artist_opportunities" && Array.isArray(output?.results)) {
+  if (name === "web_search" && Array.isArray(output?.results)) {
     return `Found ${output.results.length} web ${output.results.length === 1 ? "result" : "results"}`;
   }
   if (output?.needs_confirmation) return "Waiting for your confirmation";
