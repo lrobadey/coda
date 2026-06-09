@@ -27,6 +27,12 @@ const TOOL_META = {
     started: "Adding an opportunity…",
     completed: "Opportunity added.",
   },
+  suggest_opportunity: {
+    label: "Suggest opportunity",
+    icon: "compass",
+    started: "Queuing a suggestion…",
+    completed: "Added to your Discover queue.",
+  },
   update_opportunity: {
     label: "Update opportunity",
     icon: "doc",
@@ -73,6 +79,10 @@ function formatToolAction(name, args = {}) {
     return `Creating “${args.title || "Untitled opportunity"}”${args.org ? ` at ${args.org}` : ""}`;
   }
 
+  if (name === "suggest_opportunity") {
+    return `Suggesting “${args.title || "Untitled opportunity"}”${args.org ? ` at ${args.org}` : ""}`;
+  }
+
   if (name === "update_opportunity") {
     const fields = [
       args.title ? "title" : null,
@@ -104,6 +114,10 @@ function formatToolResult(name, output) {
   }
 
   if (name === "create_opportunity" && output?.title) return `Created “${output.title}”`;
+  if (name === "suggest_opportunity") {
+    if (output?.duplicate) return output.message || "Already suggested or tracked";
+    if (output?.title) return `Queued “${output.title}” for review`;
+  }
   if (name === "update_opportunity" && output?.title) return `Updated “${output.title}”`;
   if (name === "move_opportunity" && output?.title) return `Moved “${output.title}” to ${formatStage(output.stage)}`;
   if (name === "delete_opportunity" && output?.deleted) return "Deleted the opportunity";

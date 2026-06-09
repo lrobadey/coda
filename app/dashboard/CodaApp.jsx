@@ -183,7 +183,7 @@ function Header({ view, count, query, setQuery, onAdd, isMobile }) {
     <header className="row between" style={{ padding: "16px 28px 14px", flex: "none", borderBottom: "1px solid var(--border)" }}>
       <div className="col" style={{ gap: 3 }}>
         <div className="disp" style={{ fontSize: 20, fontWeight: 700 }}>{vt.t}</div>
-        <div className="tx3" style={{ fontSize: 12.5 }}>{isProfile ? vt.s : `${count} tracked · ${vt.s}`}</div>
+        <div className="tx3" style={{ fontSize: 12.5 }}>{isProfile ? vt.s : `${count} ${view === "discover" ? "suggested" : "tracked"} · ${vt.s}`}</div>
       </div>
       <div className="row gap10">
         {!isProfile && (
@@ -299,6 +299,40 @@ function GalleryView({ opps, onOpen, isMobile }) {
             <div className="disp" style={{ fontSize: 17, fontWeight: 700, marginTop: 14, lineHeight: 1.2 }}>{opp.title}</div>
             {opp.org && <div className="tx3" style={{ fontSize: 13, marginTop: 8 }}>{opp.org}</div>}
             {opp.deadline && <div className="label" style={{ marginTop: 18 }}>Due {opp.deadline}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DiscoverView({ opps, onConfirm, onDismiss, isMobile }) {
+  if (!opps.length) return <EmptyView view="discover" />;
+  return (
+    <div style={{ height: "100%", overflow: "auto", padding: isMobile ? "10px 16px 24px" : "8px 28px 28px" }}>
+      <div className="col gap10" style={{ width: "min(680px, 100%)" }}>
+        {opps.map((opp) => (
+          <div key={opp.id} className="card row gap14 between" style={{ padding: 16, alignItems: "flex-start" }}>
+            <div className="col grow" style={{ gap: 5, minWidth: 0 }}>
+              <div className="row gap8">
+                <Icon name="compass" size={15} stroke="var(--accent-bright)" />
+                <span className="disp" style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.25 }}>{opp.title}</span>
+              </div>
+              {opp.org && <div className="tx3" style={{ fontSize: 12.5 }}>{opp.org}</div>}
+              {opp.notes && <div className="tx3" style={{ fontSize: 12.5, lineHeight: 1.4 }}>{opp.notes}</div>}
+              <div className="row gap10" style={{ marginTop: 4, flexWrap: "wrap" }}>
+                {opp.deadline && <span className="label">Due {opp.deadline}</span>}
+                {opp.source_url && (
+                  <a href={opp.source_url} target="_blank" rel="noreferrer" className="label" style={{ color: "var(--accent-bright)", textDecoration: "none" }}>
+                    Source ↗
+                  </a>
+                )}
+              </div>
+            </div>
+            <div className="row gap8" style={{ flex: "none" }}>
+              <button className="btn ghost sm" onClick={() => onDismiss(opp.id)}><Icon name="x" size={13} /> Dismiss</button>
+              <button className="btn primary sm" onClick={() => onConfirm(opp.id)}><Icon name="check" size={13} stroke="#fff" /> Track</button>
+            </div>
           </div>
         ))}
       </div>
@@ -806,11 +840,14 @@ function App({ initialOpportunities = [], initialArtistProfile = null, userId, u
   const [assistantPending, setAssistantPending] = useState(false);
   const [assistantStatus, setAssistantStatus] = useState("");
 
+  const trackedOpps = useMemo(() => opps.filter((o) => o.status !== "suggested"), [opps]);
+  const suggestedOpps = useMemo(() => opps.filter((o) => o.status === "suggested"), [opps]);
+
   const visibleOpps = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return opps;
-    return opps.filter((o) => [o.title, o.org, o.deadline].some((v) => String(v || "").toLowerCase().includes(q)));
-  }, [opps, query]);
+    if (!q) return trackedOpps;
+    return trackedOpps.filter((o) => [o.title, o.org, o.deadline].some((v) => String(v || "").toLowerCase().includes(q)));
+  }, [trackedOpps, query]);
 
   const createOpp = async (opp) => {
     setDataError("");
@@ -888,6 +925,22 @@ function App({ initialOpportunities = [], initialArtistProfile = null, userId, u
     const { error } = await supabase
       .from("opportunities")
       .delete()
+      .eq("id", id);
+
+    if (error) {
+      setOpps(previous);
+      setDataError(error.message);
+    }
+  };
+
+  const confirmOpp = async (id) => {
+    const previous = opps;
+    setOpps((list) => list.map((o) => o.id === id ? { ...o, status: "tracked" } : o));
+    setDataError("");
+
+    const { error } = await supabase
+      .from("opportunities")
+      .update({ status: "tracked", updated_at: new Date().toISOString() })
       .eq("id", id);
 
     if (error) {
@@ -1059,7 +1112,7 @@ function App({ initialOpportunities = [], initialArtistProfile = null, userId, u
     <div className={isMobile ? "col" : "row"} style={{ height: "100dvh", overflow: "hidden", alignItems: "stretch" }}>
       {!isMobile && <Sidebar view={view} setView={setView} userEmail={userEmail} />}
       <main className="col grow" style={{ height: "100%", minWidth: 0, minHeight: 0 }}>
-        <Header view={view} count={opps.length} query={query} setQuery={setQuery} onAdd={() => setAdding(true)} isMobile={isMobile} />
+        <Header view={view} count={view === "discover" ? suggestedOpps.length : trackedOpps.length} query={query} setQuery={setQuery} onAdd={() => setAdding(true)} isMobile={isMobile} />
         {dataError && (
           <div style={{ padding: isMobile ? "10px 16px 0" : "10px 28px 0" }}>
             <div className="card tx3" style={{ padding: 12, borderColor: "var(--accent-line)", background: "var(--accent-soft)", fontSize: 13 }}>
@@ -1071,7 +1124,7 @@ function App({ initialOpportunities = [], initialArtistProfile = null, userId, u
           {view === "board" && <Board opps={visibleOpps} onOpen={setDetail} onMove={moveOpp} onAdd={() => setAdding(true)} isMobile={isMobile} />}
           {view === "calendar" && (query && opps.length && !visibleOpps.length ? <SmallEmpty title="No matching deadlines" body="Clear search or try a different term." /> : <CalendarView opps={visibleOpps} onOpen={setDetail} isMobile={isMobile} />)}
           {view === "gallery" && (query && opps.length && !visibleOpps.length ? <SmallEmpty title="No matching opportunities" body="Clear search or try a different term." /> : <GalleryView opps={visibleOpps} onOpen={setDetail} isMobile={isMobile} />)}
-          {view === "discover" && <EmptyView view={view} />}
+          {view === "discover" && <DiscoverView opps={suggestedOpps} onConfirm={confirmOpp} onDismiss={deleteOpp} isMobile={isMobile} />}
           {view === "assistant" && <AssistantView messages={assistantMessages} pending={assistantPending} status={assistantStatus} onSend={sendAssistantMessage} isMobile={isMobile} />}
           {view === "artist_profile" && <ArtistProfileView profile={artistProfile} onSave={saveArtistProfile} isMobile={isMobile} userEmail={userEmail} />}
         </div>

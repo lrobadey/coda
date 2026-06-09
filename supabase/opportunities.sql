@@ -7,6 +7,7 @@ create table if not exists public.opportunities (
   org text,
   deadline date,
   stage text not null default 'found' check (stage in ('found', 'interested', 'in_progress', 'submitted', 'response')),
+  status text not null default 'tracked' check (status in ('suggested', 'tracked')),
   source_url text,
   notes text,
   created_at timestamptz not null default now(),
