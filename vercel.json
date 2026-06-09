@@ -1,5 +1,6 @@
 {
-  "version": 2,
+  "framework": "nextjs",
+  "outputDirectory": null,
   "cleanUrls": true,
   "trailingSlash": false
 }
