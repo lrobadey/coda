@@ -5,6 +5,13 @@ export const metadata = {
   description: "AI-native opportunity tracker",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#1b1b24",
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">

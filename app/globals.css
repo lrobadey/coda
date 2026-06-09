@@ -143,3 +143,72 @@ body::before {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
 }
+
+/* ---------- Mobile ---------- */
+.mobile-nav {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  gap: 2px;
+  padding: 7px 6px calc(7px + env(safe-area-inset-bottom));
+  background: color-mix(in oklch, var(--bg) 92%, transparent);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border-top: 1px solid var(--border);
+}
+.mobile-nav-item {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 2px 5px;
+  border: none;
+  background: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--tx-3);
+  -webkit-tap-highlight-color: transparent;
+  transition: background .15s ease;
+}
+.mobile-nav-item:active { background: var(--surface-2); }
+.mobile-nav-dot {
+  position: absolute;
+  top: 0;
+  width: 22px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--accent-bright);
+  box-shadow: 0 0 10px -1px var(--accent-glow);
+  transition: opacity .18s ease;
+}
+
+.sheet-grabber {
+  width: 38px;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  margin: 0 auto 2px;
+  flex: none;
+}
+.sheet-up { animation: sheet-up .26s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes sheet-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 760px) {
+  html { -webkit-text-size-adjust: 100%; }
+  /* iOS zooms in on focus when font-size < 16px — keep form fields at 16px */
+  .input, select.input, textarea.input { font-size: 16px; }
+  .btn:active { transform: none; }
+
+  .board-scroll {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scroll-padding-left: 16px;
+  }
+  .board-col { scroll-snap-align: start; }
+}

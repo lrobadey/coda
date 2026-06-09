@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
 
 const STAGES = [
@@ -28,6 +28,27 @@ const VIEW_TITLE = {
   assistant: { t: "Assistant", s: "Find, organize, and draft with Coda" },
   artist_profile: { t: "Artist Profile", s: "Tell Coda who you are as an artist" },
 };
+
+const NAV_SHORT = {
+  board: "Board",
+  calendar: "Calendar",
+  gallery: "Gallery",
+  discover: "Discover",
+  assistant: "Assistant",
+  artist_profile: "Profile",
+};
+
+function useIsMobile(breakpoint = 760) {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [breakpoint]);
+  return isMobile;
+}
 
 function daysUntil(iso) {
   const day = new Date(iso + "T00:00:00");
@@ -107,9 +128,57 @@ function Sidebar({ view, setView, userEmail }) {
   );
 }
 
-function Header({ view, count, query, setQuery, onAdd }) {
+function MobileNav({ view, setView }) {
+  return (
+    <nav className="mobile-nav" aria-label="Primary">
+      {VIEWS.map((v) => {
+        const active = view === v.id;
+        return (
+          <button key={v.id} type="button" className="mobile-nav-item" aria-current={active ? "page" : undefined} onClick={() => setView(v.id)}>
+            <span className="mobile-nav-dot" style={{ opacity: active ? 1 : 0 }} />
+            <Icon name={v.icon} size={21} stroke={active ? "var(--accent-bright)" : "var(--tx-3)"} sw={active ? 2 : 1.8} />
+            <span style={{ fontSize: 9.5, fontWeight: active ? 700 : 500, letterSpacing: "-0.01em", color: active ? "var(--tx)" : "var(--tx-3)" }}>{NAV_SHORT[v.id]}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function Header({ view, count, query, setQuery, onAdd, isMobile }) {
   const vt = VIEW_TITLE[view];
   const isProfile = view === "artist_profile";
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  if (isMobile) {
+    return (
+      <header className="col" style={{ padding: "12px 16px 10px", flex: "none", borderBottom: "1px solid var(--border)", gap: searchOpen && !isProfile ? 10 : 0, background: "var(--bg)" }}>
+        <div className="row between gap10">
+          <div className="row gap10" style={{ minWidth: 0 }}>
+            <span style={{ width: 34, height: 34, flex: "none", borderRadius: 11, display: "grid", placeItems: "center", background: "var(--accent-soft)", border: "1px solid var(--accent-line)" }}>
+              <Icon name="coda" size={17} stroke="var(--accent-bright)" sw={2} />
+            </span>
+            <div className="col" style={{ gap: 1, minWidth: 0 }}>
+              <div className="disp" style={{ fontSize: 18, fontWeight: 750, lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{vt.t}</div>
+              <div className="tx3" style={{ fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{isProfile ? vt.s : `${count} tracked`}</div>
+            </div>
+          </div>
+          <div className="row gap8" style={{ flex: "none" }}>
+            {!isProfile && <button type="button" className="btn ghost" style={{ padding: 10 }} onClick={() => setSearchOpen((o) => !o)} aria-label="Search"><Icon name="search" size={18} /></button>}
+            {!isProfile && <button type="button" className="btn primary" style={{ padding: 10 }} onClick={onAdd} aria-label="Add opportunity"><Icon name="plus" size={17} stroke="#fff" /></button>}
+          </div>
+        </div>
+        {!isProfile && searchOpen && (
+          <div className="row gap8 fade" style={{ background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px" }}>
+            <Icon name="search" size={16} stroke="var(--tx-4)" />
+            <input className="input" autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search opportunities…" style={{ border: "none", background: "transparent", padding: 0 }} />
+            {query && <button type="button" className="btn ghost" style={{ padding: 2 }} onClick={() => setQuery("")} aria-label="Clear search"><Icon name="x" size={14} /></button>}
+          </div>
+        )}
+      </header>
+    );
+  }
+
   return (
     <header className="row between" style={{ padding: "16px 28px 14px", flex: "none", borderBottom: "1px solid var(--border)" }}>
       <div className="col" style={{ gap: 3 }}>
@@ -141,22 +210,22 @@ function OppCard({ opp, onOpen, onDragStart }) {
   );
 }
 
-function Board({ opps, onOpen, onMove, onAdd }) {
+function Board({ opps, onOpen, onMove, onAdd, isMobile }) {
   const [dragId, setDragId] = useState(null);
   return (
-    <div className="row gap14 astart" style={{ padding: "8px 28px 28px", overflowX: "auto", height: "100%", alignItems: "stretch" }}>
+    <div className={"row gap14 astart" + (isMobile ? " board-scroll" : "")} style={{ padding: isMobile ? "10px 16px 20px" : "8px 28px 28px", overflowX: "auto", height: "100%", alignItems: "stretch" }}>
       {STAGES.map((st) => {
         const items = opps.filter((o) => o.stage === st.id);
         return (
-          <div key={st.id} className="col" style={{ width: 280, flex: "none" }} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragId) onMove(dragId, st.id); setDragId(null); }}>
+          <div key={st.id} className="col board-col" style={{ width: isMobile ? "min(84vw, 320px)" : 280, flex: "none" }} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragId) onMove(dragId, st.id); setDragId(null); }}>
             <div className="row gap8" style={{ padding: "2px 6px 12px", flex: "none" }}>
               <span style={{ width: 8, height: 8, borderRadius: 3, flex: "none", background: st.color, boxShadow: `0 0 10px -1px ${st.color}` }} />
               <span className="disp" style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>{st.label}</span>
               <span className="mono tx4" style={{ fontSize: 12 }}>{items.length}</span>
             </div>
-            <div className="card col gap10" style={{ padding: 10, flex: 1, minHeight: 140, background: "var(--bg-2)", borderColor: "var(--hairline)" }}>
+            <div className="card col gap10" style={{ padding: 10, flex: 1, minHeight: 140, background: "var(--bg-2)", borderColor: "var(--hairline)", overflowY: isMobile ? "auto" : undefined }}>
               {items.map((opp) => <OppCard key={opp.id} opp={opp} onOpen={onOpen} onDragStart={() => setDragId(opp.id)} />)}
-              {items.length === 0 && <div className="col center" style={{ alignItems: "center", padding: "26px 6px", gap: 8 }}><span className="label">drop here</span><button className="btn sm ghost" onClick={onAdd}><Icon name="plus" size={13} /> Add</button></div>}
+              {items.length === 0 && <div className="col center" style={{ alignItems: "center", padding: "26px 6px", gap: 8 }}><span className="label">{isMobile ? "empty" : "drop here"}</span><button className="btn sm ghost" onClick={onAdd}><Icon name="plus" size={13} /> Add</button></div>}
             </div>
           </div>
         );
@@ -177,7 +246,7 @@ function SmallEmpty({ title, body }) {
   );
 }
 
-function CalendarView({ opps, onOpen }) {
+function CalendarView({ opps, onOpen, isMobile }) {
   const dated = [...opps].filter((o) => o.deadline).sort((a, b) => a.deadline.localeCompare(b.deadline));
   if (opps.length && !dated.length) return <EmptyView view="calendar" />;
   if (!dated.length) return <EmptyView view="calendar" />;
@@ -190,7 +259,7 @@ function CalendarView({ opps, onOpen }) {
   ];
 
   return (
-    <div className="col gap14" style={{ height: "100%", overflow: "auto", padding: "8px 28px 28px" }}>
+    <div className="col gap14" style={{ height: "100%", overflow: "auto", padding: isMobile ? "10px 16px 24px" : "8px 28px 28px" }}>
       {buckets.map((bucket) => {
         const items = dated.filter((o) => bucket.test(daysUntil(o.deadline)));
         if (!items.length) return null;
@@ -219,11 +288,11 @@ function CalendarView({ opps, onOpen }) {
   );
 }
 
-function GalleryView({ opps, onOpen }) {
+function GalleryView({ opps, onOpen, isMobile }) {
   if (!opps.length) return <EmptyView view="gallery" />;
   return (
-    <div style={{ height: "100%", overflow: "auto", padding: "8px 28px 28px" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+    <div style={{ height: "100%", overflow: "auto", padding: isMobile ? "10px 16px 24px" : "8px 28px 28px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(240px, 1fr))", gap: isMobile ? 12 : 14 }}>
         {opps.map((opp) => (
           <div key={opp.id} className="card" onClick={() => onOpen(opp)} style={{ padding: 16, cursor: "pointer", minHeight: 150 }}>
             <div className="label">{stageLabel(opp.stage)}</div>
@@ -444,7 +513,7 @@ function ToolCallCard({ tool }) {
   );
 }
 
-function AssistantView({ messages, pending, status, onSend }) {
+function AssistantView({ messages, pending, status, onSend, isMobile }) {
   const [input, setInput] = useState("");
   const submit = async (e) => {
     e.preventDefault();
@@ -455,9 +524,9 @@ function AssistantView({ messages, pending, status, onSend }) {
   };
 
   return (
-    <div className="col" style={{ height: "100%", padding: "8px 28px 28px", gap: 14 }}>
+    <div className="col" style={{ height: "100%", padding: isMobile ? "10px 12px 12px" : "8px 28px 28px", gap: 14 }}>
       <div className="card col grow" style={{ minHeight: 0, overflow: "hidden", background: "var(--bg-2)" }}>
-        <div className="col grow" style={{ gap: 12, overflow: "auto", padding: 18 }}>
+        <div className="col grow" style={{ gap: 12, overflow: "auto", padding: isMobile ? 14 : 18 }}>
           {!messages.length && (
             <div className="card" style={{ padding: 18, background: "var(--surface-2)" }}>
               <div className="row gap8"><Icon name="sparkle" size={17} stroke="var(--accent-bright)" /><div className="disp" style={{ fontWeight: 700 }}>Coda is ready</div></div>
@@ -548,7 +617,7 @@ function calculateAge(birthdate) {
   return age >= 0 ? age : null;
 }
 
-function ArtistProfileView({ profile, onSave }) {
+function ArtistProfileView({ profile, onSave, isMobile, userEmail }) {
   const [form, setForm] = useState({
     full_name: profile?.full_name || "",
     discipline: profile?.discipline || "",
@@ -576,8 +645,8 @@ function ArtistProfileView({ profile, onSave }) {
   };
 
   return (
-    <div style={{ height: "100%", overflow: "auto", padding: "8px 28px 28px" }}>
-      <form onSubmit={submit} className="card col gap14" style={{ width: "min(720px, 100%)", padding: 20, background: "linear-gradient(180deg, var(--surface), var(--bg-2))" }}>
+    <div className="col gap14" style={{ height: "100%", overflow: "auto", padding: isMobile ? "10px 16px 24px" : "8px 28px 28px" }}>
+      <form onSubmit={submit} className="card col gap14" style={{ width: "min(720px, 100%)", padding: isMobile ? 18 : 20, background: "linear-gradient(180deg, var(--surface), var(--bg-2))" }}>
         <div className="row gap10" style={{ alignItems: "flex-start" }}>
           <span style={{ width: 38, height: 38, borderRadius: 14, display: "grid", placeItems: "center", background: "var(--accent-soft)", border: "1px solid var(--accent-line)" }}>
             <Icon name="user" size={18} stroke="var(--accent-bright)" />
@@ -620,11 +689,26 @@ function ArtistProfileView({ profile, onSave }) {
           </button>
         </div>
       </form>
+
+      {isMobile && (
+        <div className="card row between gap10" style={{ width: "min(720px, 100%)", padding: 16 }}>
+          <div className="row gap10" style={{ minWidth: 0 }}>
+            <span style={{ width: 34, height: 34, flex: "none", borderRadius: "50%", background: "var(--surface-3)", border: "1px solid var(--border-2)" }} />
+            <div className="col" style={{ gap: 2, minWidth: 0 }}>
+              <span className="label" style={{ letterSpacing: "0.08em" }}>Signed in</span>
+              <span className="tx3" style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</span>
+            </div>
+          </div>
+          <form action="/auth/signout" method="post" style={{ flex: "none" }}>
+            <button className="btn sm" type="submit">Sign out</button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
 
-function AddDialog({ onClose, onCreate }) {
+function AddDialog({ onClose, onCreate, isMobile }) {
   const [form, setForm] = useState({ title: "", org: "", deadline: "", stage: "found" });
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
@@ -635,9 +719,14 @@ function AddDialog({ onClose, onCreate }) {
     await onCreate({ ...form, title: form.title.trim() });
     setSaving(false);
   };
+  const overlayStyle = { position: "fixed", inset: 0, zIndex: 30, display: "grid", placeItems: isMobile ? "end stretch" : "center", background: "oklch(0.1 0.01 265 / 0.65)", padding: isMobile ? 0 : 20 };
+  const formStyle = isMobile
+    ? { width: "100%", padding: "8px 18px calc(20px + env(safe-area-inset-bottom))", borderRadius: "22px 22px 0 0", maxHeight: "92dvh", overflowY: "auto" }
+    : { width: "min(460px, 100%)", padding: 20 };
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 10, display: "grid", placeItems: "center", background: "oklch(0.1 0.01 265 / 0.65)", padding: 20 }} onClick={onClose}>
-      <form className="card col gap14" onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{ width: "min(460px, 100%)", padding: 20 }}>
+    <div style={overlayStyle} onClick={onClose}>
+      <form className={"card col gap14 " + (isMobile ? "sheet-up" : "fade")} onSubmit={submit} onClick={(e) => e.stopPropagation()} style={formStyle}>
+        {isMobile && <div className="sheet-grabber" />}
         <div className="row between"><div className="disp" style={{ fontSize: 18, fontWeight: 700 }}>Add opportunity</div><button type="button" className="btn ghost" style={{ padding: 7 }} onClick={onClose}><Icon name="x" size={15} /></button></div>
         <input className="input" autoFocus placeholder="Title" value={form.title} onChange={(e) => set("title", e.target.value)} />
         <input className="input" placeholder="Organization / source" value={form.org} onChange={(e) => set("org", e.target.value)} />
@@ -649,7 +738,7 @@ function AddDialog({ onClose, onCreate }) {
   );
 }
 
-function DetailDrawer({ opp, onClose, onUpdate, onDelete }) {
+function DetailDrawer({ opp, onClose, onUpdate, onDelete, isMobile }) {
   const [form, setForm] = useState({ title: opp.title, org: opp.org || "", deadline: opp.deadline || "", stage: opp.stage || "found" });
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   const dirty = ["title", "org", "deadline", "stage"].some((key) => form[key] !== (opp[key] || (key === "stage" ? "found" : "")));
@@ -659,9 +748,15 @@ function DetailDrawer({ opp, onClose, onUpdate, onDelete }) {
     onUpdate(opp.id, { ...form, title: form.title.trim() });
   };
 
+  const overlayStyle = { position: "fixed", inset: 0, zIndex: 30, background: "oklch(0.1 0.01 265 / 0.55)", display: isMobile ? "grid" : undefined, placeItems: isMobile ? "end stretch" : undefined };
+  const asideStyle = isMobile
+    ? { width: "100%", maxHeight: "92dvh", overflowY: "auto", background: "var(--bg)", borderTop: "1px solid var(--border)", borderRadius: "22px 22px 0 0", padding: "8px 18px calc(18px + env(safe-area-inset-bottom))", gap: 16 }
+    : { marginLeft: "auto", width: "min(420px, 100%)", height: "100%", background: "var(--bg)", borderLeft: "1px solid var(--border)", padding: 22, gap: 18 };
+
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 10, background: "oklch(0.1 0.01 265 / 0.55)" }} onClick={onClose}>
-      <aside className="col" onClick={(e) => e.stopPropagation()} style={{ marginLeft: "auto", width: "min(420px, 100%)", height: "100%", background: "var(--bg)", borderLeft: "1px solid var(--border)", padding: 22, gap: 18 }}>
+    <div style={overlayStyle} onClick={onClose}>
+      <aside className={"col" + (isMobile ? " sheet-up" : "")} onClick={(e) => e.stopPropagation()} style={asideStyle}>
+        {isMobile && <div className="sheet-grabber" />}
         <form className="col gap14 grow" onSubmit={save}>
           <div className="row between">
             <div className="disp" style={{ fontSize: 20, fontWeight: 750 }}>Edit opportunity</div>
@@ -698,6 +793,7 @@ function DetailDrawer({ opp, onClose, onUpdate, onDelete }) {
 
 function App({ initialOpportunities = [], initialArtistProfile = null, userId, userEmail, initialError = "" }) {
   const supabase = createClient();
+  const isMobile = useIsMobile();
   const [view, setView] = useState("board");
   const [opps, setOpps] = useState(initialOpportunities);
   const [artistProfile, setArtistProfile] = useState(initialArtistProfile);
@@ -960,28 +1056,29 @@ function App({ initialOpportunities = [], initialArtistProfile = null, userId, u
   };
 
   return (
-    <div className="row" style={{ height: "100vh", overflow: "hidden", alignItems: "stretch" }}>
-      <Sidebar view={view} setView={setView} userEmail={userEmail} />
-      <main className="col grow" style={{ height: "100%", minWidth: 0 }}>
-        <Header view={view} count={opps.length} query={query} setQuery={setQuery} onAdd={() => setAdding(true)} />
+    <div className={isMobile ? "col" : "row"} style={{ height: "100dvh", overflow: "hidden", alignItems: "stretch" }}>
+      {!isMobile && <Sidebar view={view} setView={setView} userEmail={userEmail} />}
+      <main className="col grow" style={{ height: "100%", minWidth: 0, minHeight: 0 }}>
+        <Header view={view} count={opps.length} query={query} setQuery={setQuery} onAdd={() => setAdding(true)} isMobile={isMobile} />
         {dataError && (
-          <div style={{ padding: "10px 28px 0" }}>
+          <div style={{ padding: isMobile ? "10px 16px 0" : "10px 28px 0" }}>
             <div className="card tx3" style={{ padding: 12, borderColor: "var(--accent-line)", background: "var(--accent-soft)", fontSize: 13 }}>
               Database error: {dataError}
             </div>
           </div>
         )}
         <div className="grow" style={{ minHeight: 0 }}>
-          {view === "board" && <Board opps={visibleOpps} onOpen={setDetail} onMove={moveOpp} onAdd={() => setAdding(true)} />}
-          {view === "calendar" && (query && opps.length && !visibleOpps.length ? <SmallEmpty title="No matching deadlines" body="Clear search or try a different term." /> : <CalendarView opps={visibleOpps} onOpen={setDetail} />)}
-          {view === "gallery" && (query && opps.length && !visibleOpps.length ? <SmallEmpty title="No matching opportunities" body="Clear search or try a different term." /> : <GalleryView opps={visibleOpps} onOpen={setDetail} />)}
+          {view === "board" && <Board opps={visibleOpps} onOpen={setDetail} onMove={moveOpp} onAdd={() => setAdding(true)} isMobile={isMobile} />}
+          {view === "calendar" && (query && opps.length && !visibleOpps.length ? <SmallEmpty title="No matching deadlines" body="Clear search or try a different term." /> : <CalendarView opps={visibleOpps} onOpen={setDetail} isMobile={isMobile} />)}
+          {view === "gallery" && (query && opps.length && !visibleOpps.length ? <SmallEmpty title="No matching opportunities" body="Clear search or try a different term." /> : <GalleryView opps={visibleOpps} onOpen={setDetail} isMobile={isMobile} />)}
           {view === "discover" && <EmptyView view={view} />}
-          {view === "assistant" && <AssistantView messages={assistantMessages} pending={assistantPending} status={assistantStatus} onSend={sendAssistantMessage} />}
-          {view === "artist_profile" && <ArtistProfileView profile={artistProfile} onSave={saveArtistProfile} />}
+          {view === "assistant" && <AssistantView messages={assistantMessages} pending={assistantPending} status={assistantStatus} onSend={sendAssistantMessage} isMobile={isMobile} />}
+          {view === "artist_profile" && <ArtistProfileView profile={artistProfile} onSave={saveArtistProfile} isMobile={isMobile} userEmail={userEmail} />}
         </div>
       </main>
-      {adding && <AddDialog onClose={() => setAdding(false)} onCreate={createOpp} />}
-      {detail && <DetailDrawer opp={opps.find((o) => o.id === detail.id) || detail} onClose={() => setDetail(null)} onUpdate={updateOpp} onDelete={deleteOpp} />}
+      {isMobile && <MobileNav view={view} setView={setView} />}
+      {adding && <AddDialog onClose={() => setAdding(false)} onCreate={createOpp} isMobile={isMobile} />}
+      {detail && <DetailDrawer opp={opps.find((o) => o.id === detail.id) || detail} onClose={() => setDetail(null)} onUpdate={updateOpp} onDelete={deleteOpp} isMobile={isMobile} />}
     </div>
   );
 }
