@@ -25,6 +25,17 @@ const VIEW_TITLE = {
   assistant: { t: "Assistant", s: "Find, organize, and draft with Coda" },
 };
 
+function daysUntil(iso) {
+  const day = new Date(iso + "T00:00:00");
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return Math.ceil((day - now) / 86400000);
+}
+
+function stageLabel(id) {
+  return STAGES.find((s) => s.id === id)?.label || "Found it";
+}
+
 function Icon({ name, size = 18, stroke = "currentColor", sw = 1.9, fill = "none", style }) {
   const p = { fill, stroke, strokeWidth: sw, strokeLinecap: "round", strokeLinejoin: "round" };
   const paths = {
@@ -140,6 +151,78 @@ function Board({ opps, onOpen, onMove, onAdd }) {
   );
 }
 
+function SmallEmpty({ title, body }) {
+  return (
+    <div className="fade" style={{ height: "100%", display: "grid", placeItems: "center", padding: 28 }}>
+      <div className="card" style={{ width: "min(520px, 100%)", padding: 36, textAlign: "center" }}>
+        <Icon name="search" size={26} stroke="var(--accent-bright)" />
+        <div className="disp" style={{ fontSize: 18, fontWeight: 600, marginTop: 14 }}>{title}</div>
+        <div className="tx3" style={{ fontSize: 13, marginTop: 6, lineHeight: 1.45 }}>{body}</div>
+      </div>
+    </div>
+  );
+}
+
+function CalendarView({ opps, onOpen }) {
+  const dated = [...opps].filter((o) => o.deadline).sort((a, b) => a.deadline.localeCompare(b.deadline));
+  if (opps.length && !dated.length) return <EmptyView view="calendar" />;
+  if (!dated.length) return <EmptyView view="calendar" />;
+
+  const buckets = [
+    { id: "overdue", label: "Overdue", test: (n) => n < 0 },
+    { id: "week", label: "This week", test: (n) => n >= 0 && n <= 7 },
+    { id: "month", label: "This month", test: (n) => n > 7 && n <= 30 },
+    { id: "later", label: "Later", test: (n) => n > 30 },
+  ];
+
+  return (
+    <div className="fade col gap14" style={{ height: "100%", overflow: "auto", padding: "8px 28px 28px" }}>
+      {buckets.map((bucket) => {
+        const items = dated.filter((o) => bucket.test(daysUntil(o.deadline)));
+        if (!items.length) return null;
+        return (
+          <section key={bucket.id} className="card" style={{ padding: 16 }}>
+            <div className="row gap8" style={{ marginBottom: 12 }}>
+              <div className="disp" style={{ fontSize: 15, fontWeight: 700 }}>{bucket.label}</div>
+              <span className="mono tx4" style={{ fontSize: 12 }}>{items.length}</span>
+            </div>
+            <div className="col gap8">
+              {items.map((opp) => (
+                <button key={opp.id} onClick={() => onOpen(opp)} className="row between"
+                  style={{ cursor: "pointer", textAlign: "left", padding: 12, borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--tx)" }}>
+                  <span className="col" style={{ gap: 4 }}>
+                    <span className="disp" style={{ fontWeight: 650 }}>{opp.title}</span>
+                    <span className="tx3" style={{ fontSize: 12.5 }}>{opp.org || stageLabel(opp.stage)}</span>
+                  </span>
+                  <span className="label">{opp.deadline}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function GalleryView({ opps, onOpen }) {
+  if (!opps.length) return <EmptyView view="gallery" />;
+  return (
+    <div className="fade" style={{ height: "100%", overflow: "auto", padding: "8px 28px 28px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+        {opps.map((opp) => (
+          <div key={opp.id} className="card" onClick={() => onOpen(opp)} style={{ padding: 16, cursor: "pointer", minHeight: 150 }}>
+            <div className="label">{stageLabel(opp.stage)}</div>
+            <div className="disp" style={{ fontSize: 17, fontWeight: 700, marginTop: 14, lineHeight: 1.2 }}>{opp.title}</div>
+            {opp.org && <div className="tx3" style={{ fontSize: 13, marginTop: 8 }}>{opp.org}</div>}
+            {opp.deadline && <div className="label" style={{ marginTop: 18 }}>Due {opp.deadline}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function EmptyView({ view }) {
   const empty = {
     calendar: ["No deadlines yet", "Add an opportunity and Coda will build your timeline."],
@@ -220,7 +303,10 @@ function App() {
       <main className="col grow" style={{ height: "100%", minWidth: 0 }}>
         <Header view={view} count={opps.length} query={query} setQuery={setQuery} onAdd={() => setAdding(true)} />
         <div className="grow" style={{ minHeight: 0 }}>
-          {view === "board" ? <Board opps={visibleOpps} onOpen={setDetail} onMove={moveOpp} onAdd={() => setAdding(true)} /> : <EmptyView view={view} />}
+          {view === "board" && <Board opps={visibleOpps} onOpen={setDetail} onMove={moveOpp} onAdd={() => setAdding(true)} />}
+          {view === "calendar" && (query && opps.length && !visibleOpps.length ? <SmallEmpty title="No matching deadlines" body="Clear search or try a different term." /> : <CalendarView opps={visibleOpps} onOpen={setDetail} />)}
+          {view === "gallery" && (query && opps.length && !visibleOpps.length ? <SmallEmpty title="No matching opportunities" body="Clear search or try a different term." /> : <GalleryView opps={visibleOpps} onOpen={setDetail} />)}
+          {(view === "discover" || view === "assistant") && <EmptyView view={view} />}
         </div>
       </main>
       {adding && <AddDialog onClose={() => setAdding(false)} onCreate={(opp) => { setOpps((list) => [...list, opp]); setAdding(false); setView("board"); }} />}
