@@ -255,6 +255,98 @@ function EmptyView({ view }) {
   );
 }
 
+function renderInlineMarkdown(text) {
+  const parts = [];
+  const pattern = /(\[[^\]]+\]\((https?:\/\/[^\s)]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|\*([^*]+)\*)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+
+    if (match[2]) {
+      parts.push(
+        <a key={parts.length} href={match[2]} target="_blank" rel="noreferrer" style={{ color: "var(--accent-bright)", textDecoration: "none", borderBottom: "1px solid var(--accent-line)" }}>
+          {match[1].slice(1, match[1].indexOf("]"))}
+        </a>
+      );
+    } else if (match[3]) {
+      parts.push(<code key={parts.length} style={{ padding: "1px 5px", borderRadius: 6, background: "var(--bg-2)", border: "1px solid var(--hairline)", fontSize: "0.92em" }}>{match[3]}</code>);
+    } else if (match[4]) {
+      parts.push(<strong key={parts.length} style={{ color: "var(--tx)", fontWeight: 750 }}>{match[4]}</strong>);
+    } else if (match[5]) {
+      parts.push(<em key={parts.length}>{match[5]}</em>);
+    }
+
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
+
+function MarkdownText({ text }) {
+  const lines = String(text || "").split("\n");
+  const blocks = [];
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+
+    if (!line.trim()) {
+      blocks.push(<div key={blocks.length} style={{ height: 6 }} />);
+      continue;
+    }
+
+    if (line.trim().startsWith("```")) {
+      const code = [];
+      i += 1;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) {
+        code.push(lines[i]);
+        i += 1;
+      }
+      blocks.push(
+        <pre key={blocks.length} style={{ margin: "6px 0", padding: 12, overflow: "auto", borderRadius: 10, background: "var(--bg-2)", border: "1px solid var(--hairline)", whiteSpace: "pre-wrap" }}>
+          <code>{code.join("\n")}</code>
+        </pre>
+      );
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      blocks.push(
+        <div key={blocks.length} className="disp" style={{ fontSize: heading[1].length === 1 ? 17 : 15, fontWeight: 750, marginTop: 4 }}>
+          {renderInlineMarkdown(heading[2])}
+        </div>
+      );
+      continue;
+    }
+
+    const listMatch = line.match(/^\s*([-*]|\d+\.)\s+(.+)$/);
+    if (listMatch) {
+      const ordered = /\d+\./.test(listMatch[1]);
+      const items = [listMatch[2]];
+      while (i + 1 < lines.length) {
+        const next = lines[i + 1].match(/^\s*([-*]|\d+\.)\s+(.+)$/);
+        if (!next || /\d+\./.test(next[1]) !== ordered) break;
+        items.push(next[2]);
+        i += 1;
+      }
+      const ListTag = ordered ? "ol" : "ul";
+      blocks.push(
+        <ListTag key={blocks.length} style={{ margin: "4px 0", paddingLeft: 20 }}>
+          {items.map((item, index) => <li key={index} style={{ margin: "3px 0" }}>{renderInlineMarkdown(item)}</li>)}
+        </ListTag>
+      );
+      continue;
+    }
+
+    blocks.push(<div key={blocks.length}>{renderInlineMarkdown(line)}</div>);
+  }
+
+  return <div style={{ display: "grid", gap: 2 }}>{blocks}</div>;
+}
+
 function ReasoningSummaryCard({ summary, active }) {
   const [expanded, setExpanded] = useState(true);
   const text = summary?.trim() || "Coda is gathering its thoughts…";
@@ -407,11 +499,11 @@ function AssistantView({ messages, pending, status, onSend }) {
                       background: isUser ? "var(--accent)" : message.error ? "var(--accent-soft)" : "var(--surface-2)",
                       borderColor: message.error ? "var(--accent-line)" : "var(--border)",
                       color: isUser ? "#fff" : "var(--tx)",
-                      whiteSpace: "pre-wrap",
+                      whiteSpace: isUser || message.error ? "pre-wrap" : "normal",
                       lineHeight: 1.45,
                       fontSize: 14,
                     }}>
-                      {message.content}
+                      {!isUser && !message.error ? <MarkdownText text={message.content} /> : message.content}
                     </div>
                   )}
                 </div>
