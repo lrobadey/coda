@@ -234,7 +234,7 @@ function EmptyView({ view }) {
   return (
     <div className="fade" style={{ height: "100%", display: "grid", placeItems: "center", padding: 28 }}>
       <div className="card" style={{ width: "min(520px, 100%)", padding: 36, textAlign: "center" }}>
-        <Icon name={view === "assistant" ? "message" : view === "discover" ? "sparkle" : "doc"} size={28} stroke="var(--accent-bright)" />
+        <Icon name={view === "assistant" ? "message" : view === "discover" ? "compass" : "doc"} size={28} stroke="var(--accent-bright)" />
         <div className="disp" style={{ fontSize: 18, fontWeight: 600, marginTop: 14 }}>{empty[0]}</div>
         <div className="tx3" style={{ fontSize: 13, marginTop: 6, lineHeight: 1.45 }}>{empty[1]}</div>
       </div>
