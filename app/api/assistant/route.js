@@ -253,7 +253,7 @@ export async function POST(request) {
 
           const result = await run(agent, input, {
             stream: true,
-            maxTurns: 8,
+            maxTurns: 12,
             tracing: true,
             signal: request.signal,
           });
