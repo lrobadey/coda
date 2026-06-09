@@ -205,7 +205,16 @@ function OppCard({ opp, onOpen, onDragStart }) {
       style={{ padding: 14, cursor: "pointer", background: "var(--surface-2)" }}>
       <div className="disp" style={{ fontSize: 14.5, fontWeight: 650, lineHeight: 1.25 }}>{opp.title}</div>
       {opp.org && <div className="tx3" style={{ fontSize: 12.5, marginTop: 5 }}>{opp.org}</div>}
-      {opp.deadline && <div className="label" style={{ marginTop: 12 }}>Due {opp.deadline}</div>}
+      {(opp.deadline || opp.source_url) && (
+        <div className="row gap10 between" style={{ marginTop: 12 }}>
+          {opp.deadline ? <span className="label">Due {opp.deadline}</span> : <span />}
+          {opp.source_url && (
+            <a href={opp.source_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="label" style={{ color: "var(--accent-bright)", textDecoration: "none" }}>
+              Source ↗
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -298,7 +307,16 @@ function GalleryView({ opps, onOpen, isMobile }) {
             <div className="label">{stageLabel(opp.stage)}</div>
             <div className="disp" style={{ fontSize: 17, fontWeight: 700, marginTop: 14, lineHeight: 1.2 }}>{opp.title}</div>
             {opp.org && <div className="tx3" style={{ fontSize: 13, marginTop: 8 }}>{opp.org}</div>}
-            {opp.deadline && <div className="label" style={{ marginTop: 18 }}>Due {opp.deadline}</div>}
+            {(opp.deadline || opp.source_url) && (
+              <div className="row gap10 between" style={{ marginTop: 18 }}>
+                {opp.deadline ? <span className="label">Due {opp.deadline}</span> : <span />}
+                {opp.source_url && (
+                  <a href={opp.source_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="label" style={{ color: "var(--accent-bright)", textDecoration: "none" }}>
+                    Source ↗
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -773,9 +791,9 @@ function AddDialog({ onClose, onCreate, isMobile }) {
 }
 
 function DetailDrawer({ opp, onClose, onUpdate, onDelete, isMobile }) {
-  const [form, setForm] = useState({ title: opp.title, org: opp.org || "", deadline: opp.deadline || "", stage: opp.stage || "found" });
+  const [form, setForm] = useState({ title: opp.title, org: opp.org || "", deadline: opp.deadline || "", stage: opp.stage || "found", source_url: opp.source_url || "" });
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
-  const dirty = ["title", "org", "deadline", "stage"].some((key) => form[key] !== (opp[key] || (key === "stage" ? "found" : "")));
+  const dirty = ["title", "org", "deadline", "stage", "source_url"].some((key) => form[key] !== (opp[key] || (key === "stage" ? "found" : "")));
   const save = (e) => {
     e.preventDefault();
     if (!form.title.trim()) return;
@@ -812,6 +830,17 @@ function DetailDrawer({ opp, onClose, onUpdate, onDelete, isMobile }) {
           <div className="col gap8">
             <div className="label">Stage</div>
             <select className="input" value={form.stage} onChange={(e) => set("stage", e.target.value)}>{STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
+          </div>
+          <div className="col gap8">
+            <div className="row between">
+              <div className="label">Source URL</div>
+              {form.source_url.trim() && (
+                <a href={form.source_url.trim()} target="_blank" rel="noreferrer" className="label" style={{ color: "var(--accent-bright)", textDecoration: "none" }}>
+                  Open ↗
+                </a>
+              )}
+            </div>
+            <input className="input" type="url" placeholder="https://…" value={form.source_url} onChange={(e) => set("source_url", e.target.value)} />
           </div>
 
           <div className="grow" />
@@ -897,6 +926,7 @@ function App({ initialOpportunities = [], initialArtistProfile = null, userId, u
       ...edits,
       org: edits.org || null,
       deadline: edits.deadline || null,
+      source_url: edits.source_url?.trim() || null,
       updated_at: new Date().toISOString(),
     };
 
