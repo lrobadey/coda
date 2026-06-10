@@ -59,6 +59,33 @@ const TOOL_META = {
   },
 };
 
+// Tool results are stored in conversation history as `function_call_output`
+// items whose `output` is a JSON string. Web extracts can be tens of thousands
+// of characters, and the full history is re-sent on every turn — so stale tool
+// outputs are the dominant driver of input-token usage. Once a turn is complete
+// the model only needs a gist of what a past tool returned, not the raw page
+// content, so we shrink large historical outputs before re-sending them.
+const MAX_HISTORY_TOOL_OUTPUT_CHARS = 1500;
+
+function trimHistoryToolOutputs(history) {
+  if (!Array.isArray(history)) return [];
+
+  return history.map((item) => {
+    if (!item || item.type !== "function_call_output") return item;
+
+    const { output } = item;
+    if (typeof output !== "string" || output.length <= MAX_HISTORY_TOOL_OUTPUT_CHARS) {
+      return item;
+    }
+
+    const dropped = output.length - MAX_HISTORY_TOOL_OUTPUT_CHARS;
+    return {
+      ...item,
+      output: `${output.slice(0, MAX_HISTORY_TOOL_OUTPUT_CHARS)}\n…[${dropped} characters of earlier tool output trimmed to save context; call the tool again if you need the full content]`,
+    };
+  });
+}
+
 function parseMaybeJson(value) {
   if (!value || typeof value !== "string") return value ?? null;
   try {
@@ -236,7 +263,7 @@ export async function POST(request) {
 
     const agent = createCodaAgent({ supabase, userId: user.id, artistProfile: artistProfile || null });
     const input = [
-      ...history,
+      ...trimHistoryToolOutputs(history),
       { role: "user", content: message },
     ];
 
