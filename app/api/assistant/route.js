@@ -60,12 +60,31 @@ const TOOL_META = {
 };
 
 // Tool results are stored in conversation history as `function_call_output`
-// items whose `output` is a JSON string. Web extracts can be tens of thousands
-// of characters, and the full history is re-sent on every turn — so stale tool
-// outputs are the dominant driver of input-token usage. Once a turn is complete
-// the model only needs a gist of what a past tool returned, not the raw page
-// content, so we shrink large historical outputs before re-sending them.
+// items whose `output` is a JSON string. The full history is re-sent on every
+// turn, so stale tool outputs are the dominant driver of input-token usage.
+// Once a turn is complete the model only needs a gist of what a past tool
+// returned, so large historical outputs are shrunk before re-sending. The
+// trim is structure-aware (long string fields inside JSON are truncated,
+// keeping URLs and structured facts intact) and idempotent, so trimmed
+// history stays byte-stable across turns and prompt caching keeps working.
 const MAX_HISTORY_TOOL_OUTPUT_CHARS = 1500;
+const MAX_HISTORY_FIELD_CHARS = 400;
+const TRIM_NOTE = "[earlier tool output trimmed to save context; call the tool again if you need the full content]";
+
+function truncateLongStrings(value) {
+  if (typeof value === "string") {
+    return value.length > MAX_HISTORY_FIELD_CHARS
+      ? `${value.slice(0, MAX_HISTORY_FIELD_CHARS)}…`
+      : value;
+  }
+  if (Array.isArray(value)) return value.map(truncateLongStrings);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, truncateLongStrings(entry)])
+    );
+  }
+  return value;
+}
 
 function trimHistoryToolOutputs(history) {
   if (!Array.isArray(history)) return [];
@@ -74,15 +93,22 @@ function trimHistoryToolOutputs(history) {
     if (!item || item.type !== "function_call_output") return item;
 
     const { output } = item;
-    if (typeof output !== "string" || output.length <= MAX_HISTORY_TOOL_OUTPUT_CHARS) {
+    if (
+      typeof output !== "string" ||
+      output.length <= MAX_HISTORY_TOOL_OUTPUT_CHARS ||
+      output.endsWith(TRIM_NOTE)
+    ) {
       return item;
     }
 
-    const dropped = output.length - MAX_HISTORY_TOOL_OUTPUT_CHARS;
-    return {
-      ...item,
-      output: `${output.slice(0, MAX_HISTORY_TOOL_OUTPUT_CHARS)}\n…[${dropped} characters of earlier tool output trimmed to save context; call the tool again if you need the full content]`,
-    };
+    let trimmed;
+    try {
+      trimmed = JSON.stringify(truncateLongStrings(JSON.parse(output)));
+    } catch {
+      trimmed = output.slice(0, MAX_HISTORY_TOOL_OUTPUT_CHARS);
+    }
+
+    return { ...item, output: `${trimmed}\n${TRIM_NOTE}` };
   });
 }
 
