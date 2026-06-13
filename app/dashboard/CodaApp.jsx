@@ -232,7 +232,7 @@ function Board({ opps, onOpen, onMove, onAdd, isMobile }) {
               <span className="disp" style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>{st.label}</span>
               <span className="mono tx4" style={{ fontSize: 12 }}>{items.length}</span>
             </div>
-            <div className="card col gap10" style={{ padding: 10, flex: 1, minHeight: 140, background: "var(--bg-2)", borderColor: "var(--hairline)", overflowY: isMobile ? "auto" : undefined }}>
+            <div className="card col gap10" style={{ padding: 10, flex: 1, minHeight: 140, background: "var(--bg-2)", borderColor: "var(--hairline)", overflowY: "auto" }}>
               {items.map((opp) => <OppCard key={opp.id} opp={opp} onOpen={onOpen} onDragStart={() => setDragId(opp.id)} />)}
               {items.length === 0 && <div className="col center" style={{ alignItems: "center", padding: "26px 6px", gap: 8 }}><span className="label">{isMobile ? "empty" : "drop here"}</span><button className="btn sm ghost" onClick={onAdd}><Icon name="plus" size={13} /> Add</button></div>}
             </div>
